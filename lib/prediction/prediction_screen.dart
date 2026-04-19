@@ -5,7 +5,9 @@ import './widgets/prediction_footer.dart';
 import './widgets/steps/step1_profile.dart';
 import './widgets/steps/step2_quality.dart';
 import './widgets/steps/step3_activity.dart';
-import '../dashboard/dashboard_screen.dart'; // Hanya untuk navigasi kembali
+import '../dashboard/dashboard_screen.dart'; 
+import '../core/widgets/app_header.dart';
+import '../core/widgets/bottom_navigation.dart';
 
 
 class AssessmentScreen extends StatefulWidget {

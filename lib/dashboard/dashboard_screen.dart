@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'widgets/app_header.dart';
+import '../core/widgets/app_header.dart';
 import 'widgets/sleep_card.dart';
 import 'widgets/prediction_button.dart';
 import 'widgets/feature_grid.dart';
 import 'widgets/insight_card.dart';
-import 'widgets/bottom_navigation.dart';
+import '../core/widgets/bottom_navigation.dart';
 import 'package:sleep_detection_mobile/prediction/prediction_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -32,7 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       duration: const Duration(milliseconds: 320),
     );
     _buildAnimations(forward: true);
-    _animController.value = 1.0; // mulai di posisi akhir
+    _animController.value = 1.0; 
   }
 
   @override
@@ -41,9 +41,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
-  /// Bangun ulang animasi setiap kali tab berubah.
-  /// [forward] = true → slide dari kanan (index naik)
-  /// [forward] = false → slide dari kiri (index turun)
   void _buildAnimations({required bool forward}) {
     _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOut),
