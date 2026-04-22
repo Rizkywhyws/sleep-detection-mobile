@@ -19,9 +19,9 @@ class NocturaApp extends StatelessWidget {
         fontFamily: 'Inter',
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B1D51)), // Navy Blue Base
       ),
-      home: const LoginScreen(), // 🔄 Login jadi halaman pertama
+      home: const DashboardScreen(), // 🔄 Login jadi halaman pertama
       routes: {
-        '/dashboard': (context) => const DashboardScreen(),
+        '/dashboard': (context) => const LoginScreen(),
         '/assessment': (context) => const AssessmentScreen(),
       },
     );
