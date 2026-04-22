@@ -11,6 +11,11 @@ class UserFormData {
   int heightCm = 165;
   int weightKg = 60;
   int steps = 7000;
+  String bloodPressure = '';
+  String heartRate = '';
+  String customJob = '';
+
+
 
   double get bmi {
     if (heightCm == 0 || weightKg == 0) return 0;

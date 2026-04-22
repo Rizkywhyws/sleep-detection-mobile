@@ -17,8 +17,10 @@ class Step1Profile extends StatelessWidget {
     required this.onUpdate,
   });
 
+  static const String _otherJobValue = 'Lainnya';
+
   static final List<DropdownItem> _jobItems = [
-    DropdownItem(
+    const DropdownItem(
       value: 'Dokter',
       label: 'Dokter',
       subtitle: 'Tenaga kesehatan',
@@ -26,7 +28,7 @@ class Step1Profile extends StatelessWidget {
       iconBg: Color(0xFFFCEBEB),
       iconColor: Color(0xFFA32D2D),
     ),
-    DropdownItem(
+    const DropdownItem(
       value: 'Guru',
       label: 'Guru',
       subtitle: 'Pendidikan',
@@ -34,7 +36,7 @@ class Step1Profile extends StatelessWidget {
       iconBg: Color(0xFFFAEEDA),
       iconColor: Color(0xFF854F0B),
     ),
-    DropdownItem(
+    const DropdownItem(
       value: 'Software Engineer',
       label: 'Software Engineer',
       subtitle: 'Teknologi',
@@ -42,7 +44,7 @@ class Step1Profile extends StatelessWidget {
       iconBg: Color(0xFFEEEDFE),
       iconColor: Color(0xFF534AB7),
     ),
-    DropdownItem(
+    const DropdownItem(
       value: 'Pengacara',
       label: 'Pengacara',
       subtitle: 'Hukum',
@@ -50,7 +52,7 @@ class Step1Profile extends StatelessWidget {
       iconBg: Color(0xFFE1F5EE),
       iconColor: Color(0xFF0F6E56),
     ),
-    DropdownItem(
+    const DropdownItem(
       value: 'Insinyur',
       label: 'Insinyur',
       subtitle: 'Teknik',
@@ -58,7 +60,7 @@ class Step1Profile extends StatelessWidget {
       iconBg: Color(0xFFE6F1FB),
       iconColor: Color(0xFF185FA5),
     ),
-    DropdownItem(
+    const DropdownItem(
       value: 'Akuntan',
       label: 'Akuntan',
       subtitle: 'Keuangan',
@@ -66,42 +68,56 @@ class Step1Profile extends StatelessWidget {
       iconBg: Color(0xFFEAF3DE),
       iconColor: Color(0xFF3B6D11),
     ),
-    DropdownItem(
-  value: 'Perawat',
-  label: 'Perawat',
-  subtitle: 'Tenaga kesehatan',
-  icon: Icons.health_and_safety_outlined,
-  iconBg: Color(0xFFFCEBEB),
-  iconColor: Color(0xFFA32D2D),
-),
-DropdownItem(
-  value: 'Ilmuwan',
-  label: 'Ilmuwan',
-  subtitle: 'Penelitian & Sains',
-  icon: Icons.science_outlined,
-  iconBg: Color(0xFFE8F4FD),
-  iconColor: Color(0xFF1565C0),
-),
-DropdownItem(
-  value: 'Sales',
-  label: 'Sales',
-  subtitle: 'Penjualan',
-  icon: Icons.storefront_outlined,
-  iconBg: Color(0xFFFFF3E0),
-  iconColor: Color(0xFFE65100),
-),
-DropdownItem(
-  value: 'Sales Representative',
-  label: 'Sales Representative',
-  subtitle: 'Penjualan & Pemasaran',
-  icon: Icons.handshake_outlined,
-  iconBg: Color(0xFFF3E5F5),
-  iconColor: Color(0xFF6A1B9A),
-),
+    const DropdownItem(
+      value: 'Perawat',
+      label: 'Perawat',
+      subtitle: 'Tenaga kesehatan',
+      icon: Icons.health_and_safety_outlined,
+      iconBg: Color(0xFFFCEBEB),
+      iconColor: Color(0xFFA32D2D),
+    ),
+    const DropdownItem(
+      value: 'Ilmuwan',
+      label: 'Ilmuwan',
+      subtitle: 'Penelitian & Sains',
+      icon: Icons.science_outlined,
+      iconBg: Color(0xFFE8F4FD),
+      iconColor: Color(0xFF1565C0),
+    ),
+    const DropdownItem(
+      value: 'Sales',
+      label: 'Sales',
+      subtitle: 'Penjualan',
+      icon: Icons.storefront_outlined,
+      iconBg: Color(0xFFFFF3E0),
+      iconColor: Color(0xFFE65100),
+    ),
+    const DropdownItem(
+      value: 'Sales Representative',
+      label: 'Sales Representative',
+      subtitle: 'Penjualan & Pemasaran',
+      icon: Icons.handshake_outlined,
+      iconBg: Color(0xFFF3E5F5),
+      iconColor: Color(0xFF6A1B9A),
+    ),
+    const DropdownItem(
+      value: _otherJobValue,
+      label: 'Lainnya',
+      subtitle: 'Isi pekerjaan lain',
+      icon: Icons.edit_note_rounded,
+      iconBg: Color(0xFFF1F5F9),
+      iconColor: Color(0xFF475569),
+    ),
   ];
+
+  bool _isOtherJobSelected() {
+    return formData.job == _otherJobValue;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bool showOtherJobField = _isOtherJobSelected();
+
     return SingleChildScrollView(
       key: const ValueKey(1),
       child: Column(
@@ -109,11 +125,10 @@ DropdownItem(
           AssessmentCard(
             title: 'Data Pribadi',
             icon: Icons.person_outline_rounded,
-            iconBg: const Color(0xFFE6F1FB),
+            iconBg: const Color(0xFFEAF3FF),
             iconColor: const Color(0xFF185FA5),
             child: Column(
               children: [
-                // Gender
                 Row(
                   children: [
                     Expanded(
@@ -121,8 +136,7 @@ DropdownItem(
                         label: 'Laki-laki',
                         icon: Icons.male_rounded,
                         selected: formData.gender == 0,
-                        onTap: () =>
-                            onUpdate(() => formData.gender = 0),
+                        onTap: () => onUpdate(() => formData.gender = 0),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -131,57 +145,80 @@ DropdownItem(
                         label: 'Perempuan',
                         icon: Icons.female_rounded,
                         selected: formData.gender == 1,
-                        onTap: () =>
-                            onUpdate(() => formData.gender = 1),
+                        onTap: () => onUpdate(() => formData.gender = 1),
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 14),
-
-                // 🔥 FIX HEIGHT SAMA
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: SizedBox(
-                        height: 70, // 🔥 termasuk label + field
+                        height: 70,
                         child: AssessmentTextField(
                           label: 'Usia',
                           hint: '25',
                           type: TextInputType.number,
                           onSaved: (v) =>
-                              formData.age = int.tryParse(v!) ?? 0,
+                              formData.age = int.tryParse(v ?? '') ?? 0,
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: SizedBox(
-                        height: 70, // 🔥 sama persis
+                        height: 70,
                         child: AssessmentDropdown(
                           label: 'Pekerjaan',
-                          value: formData.job.isEmpty
-                              ? null
-                              : formData.job,
+                          value: formData.job.isEmpty ? null : formData.job,
                           items: _jobItems,
-                          onChanged: (v) =>
-                              onUpdate(() => formData.job = v ?? ''),
+                          onChanged: (v) => onUpdate(() {
+                            formData.job = v ?? '';
+                            if (formData.job != _otherJobValue) {
+                              formData.customJob = '';
+                            }
+                          }),
                         ),
                       ),
                     ),
                   ],
                 ),
+                if (showOtherJobField) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFFF8FAFF),
+                          const Color(0xFFF1F5FF),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFD9E6FF),
+                        width: 1,
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: AssessmentTextField(
+                      label: 'Pekerjaan Lainnya',
+                      hint: 'Contoh: Arsitek, Desainer, Wirausaha',
+                      type: TextInputType.text,
+                      onSaved: (v) => formData.customJob = v ?? '',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-
-          // Sleep duration
           AssessmentCard(
             title: 'Durasi Tidur',
             icon: Icons.bedtime_outlined,
-            iconBg: const Color(0xFFEEEDFE),
+            iconBg: const Color(0xFFF1EEFF),
             iconColor: const Color(0xFF534AB7),
             child: StatefulBuilder(
               builder: (_, s) => CustomSlider(
@@ -190,8 +227,7 @@ DropdownItem(
                 max: 12,
                 divisions: 24,
                 unit: 'jam',
-                onChanged: (v) =>
-                    s(() => formData.sleepDuration = v),
+                onChanged: (v) => s(() => formData.sleepDuration = v),
                 activeColor: const Color(0xFF534AB7),
                 showLabelsUnderAxis: true,
                 labels: const ['0j', '3j', '6j', '9j', '12j'],
