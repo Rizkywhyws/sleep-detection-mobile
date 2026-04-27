@@ -7,6 +7,7 @@ import 'widgets/insight_card.dart';
 import '../core/widgets/bottom_navigation.dart';
 import '../prediction/prediction_screen.dart';
 import '../education/education_screen.dart';
+import '../visualization/visualization_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,7 +24,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
-  bool _slideForward = true;
 
   @override
   void initState() {
@@ -85,6 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         bottom: false,
         child: Column(
           children: [
+            // AppHeader terpusat di sini, passing isDarkMode dan toggle
             AppHeader(
               isDarkMode: _isDarkMode,
               onThemeToggle: _toggleTheme,
@@ -95,15 +96,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                   IndexedStack(
                     index: _selectedIndex,
                     children: [
+                      // index 0 → HOME
                       _DashboardHome(
                         hPadding: hPadding,
                         vGap: vGap,
                         isSmallScreen: isSmallScreen,
                         onEducationTap: _goToEducation,
                       ),
+                      // index 1 → PREDIKSI
                       const AssessmentScreen(),
-                      const SizedBox(),
+                      // index 2 → VISUALISASI ✅ (sebelumnya SizedBox kosong)
+                      const VisualizationScreen(),
+                      // index 3 → EDUKASI
                       const EducationScreen(),
+                      // index 4 → PROFIL
+                      const SizedBox(),
                     ],
                   ),
                   AnimatedBuilder(
@@ -144,7 +151,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 }
-
 
 // ── Dashboard home page dipisah jadi widget sendiri ──
 class _DashboardHome extends StatelessWidget {
