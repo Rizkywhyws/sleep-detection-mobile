@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sleep_detection_mobile/Register/widgets/register_form.dart';
+import 'package:sleep_detection_mobile/visualization/visualization_screen.dart';
 import 'login/login_screen.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'prediction/prediction_screen.dart';
