@@ -6,7 +6,8 @@ import 'dashboard/dashboard_screen.dart';
 import 'prediction/prediction_screen.dart';
 import 'prediction/prediction_screen.dart'; 
 import 'Register/register_screen.dart';
-import 'education/education_screen.dart'; // Pastikan file ini sudah dibuat
+import 'education/education_screen.dart';
+import 'package:sleep_detection_mobile/visualization/visualization_screen.dart'; // Pastikan file ini sudah dibuat
 
 void main() => runApp(const NocturaApp());
 
@@ -25,9 +26,11 @@ class NocturaApp extends StatelessWidget {
       ),
       home: const DashboardScreen(), // 🔄 Login jadi halaman pertama
       routes: {
+        
         '/dashboard': (context) => const DashboardScreen(),
         '/assessment': (context) => const AssessmentScreen(),
         '/education': (context) => const EducationScreen(),
+        '/visualization': (context) => const VisualizationScreen(),
       },
     );
   }
