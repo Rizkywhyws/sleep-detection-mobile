@@ -32,7 +32,7 @@ class Step3Activity extends StatelessWidget {
                   hint: '30',
                   type: TextInputType.number,
                   helperText: 'Contoh: 30 = ringan, 60 = sedang, 90+ = aktif',
-                  onSaved: (v) => onUpdate(
+                  onChanged: (v) => onUpdate(
                     () => formData.activityLevel = int.tryParse(v!) ?? 0,
                   ),
                 ),
@@ -51,7 +51,6 @@ class Step3Activity extends StatelessWidget {
             iconColor: const Color(0xFF0F6E56),
             child: Column(
               children: [
-                // Di Step3Activity, bagian Data Fisik (BMI)
                 Row(
                   children: [
                     Expanded(
@@ -59,7 +58,7 @@ class Step3Activity extends StatelessWidget {
                         label: 'Tinggi (cm)',
                         hint: '165',
                         type: TextInputType.number,
-                        onChanged: (v) => onUpdate(  // ← ganti onSaved ke onChanged
+                        onChanged: (v) => onUpdate(
                           () => formData.heightCm = int.tryParse(v) ?? 0,
                         ),
                       ),
@@ -70,7 +69,7 @@ class Step3Activity extends StatelessWidget {
                         label: 'Berat (kg)',
                         hint: '60',
                         type: TextInputType.number,
-                        onChanged: (v) => onUpdate(  // ← ganti onSaved ke onChanged
+                        onChanged: (v) => onUpdate(
                           () => formData.weightKg = int.tryParse(v) ?? 0,
                         ),
                       ),
@@ -98,8 +97,8 @@ class Step3Activity extends StatelessWidget {
               hint: '7000',
               type: TextInputType.number,
               helperText: 'Dapat diisi otomatis dari sensor HP',
-              onSaved: (v) =>
-                  onUpdate(() => formData.steps = int.tryParse(v!) ?? 0),
+              // FIX: sebelumnya salah tulis ke activityLevel
+              onChanged: (v) => onUpdate(() => formData.steps = int.tryParse(v) ?? 0),
             ),
           ),
         ],
@@ -112,7 +111,6 @@ class _ActivityResult extends StatelessWidget {
   final int minutes;
   const _ActivityResult({required this.minutes});
 
-  // Clamp to 90 for model, but display real value
   String get _label {
     if (minutes < 30) return 'Sangat Rendah';
     if (minutes < 60) return 'Ringan';

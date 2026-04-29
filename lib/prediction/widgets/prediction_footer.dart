@@ -6,6 +6,7 @@ class AssessmentFooter extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
   final VoidCallback onSubmit;
+  final bool isLoading; 
 
   const AssessmentFooter({
     super.key,
@@ -14,6 +15,7 @@ class AssessmentFooter extends StatelessWidget {
     required this.onNext,
     required this.onBack,
     required this.onSubmit,
+    this.isLoading = false,
   });
 
   static const Color _navyDark = Color(0xFF071A52);
@@ -73,6 +75,7 @@ class AssessmentFooter extends StatelessWidget {
               label: 'Analisis',
               icon: Icons.analytics_outlined,
               onTap: onSubmit,
+              isLoading: isLoading, // Teruskan isLoading ke tombol
             ),
           ] else if (currentStep == 1)
             _PrimaryButton(
@@ -85,7 +88,7 @@ class AssessmentFooter extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: onBack,
+                    onPressed: isLoading ? null : onBack, // Disable saat loading
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
                         color: const Color(0xFFD6DDEB).withOpacity(0.95),
@@ -173,11 +176,13 @@ class _PrimaryButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final bool isLoading; // Tambahan property
 
   const _PrimaryButton({
     required this.label,
     required this.icon,
     required this.onTap,
+    this.isLoading = false, // Default value
   });
 
   static const Color _navyDark = Color(0xFF071A52);
@@ -187,7 +192,7 @@ class _PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isLoading ? null : onTap, // Disable tap saat loading
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -219,7 +224,7 @@ class _PrimaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              label,
+              isLoading ? 'Memproses...' : label, // Ubah teks saat loading
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -228,7 +233,18 @@ class _PrimaryButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            Icon(icon, color: Colors.white, size: 18),
+            // Tampilkan loading spinner atau icon biasa
+            if (isLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.0,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            else
+              Icon(icon, color: Colors.white, size: 18),
           ],
         ),
       ),

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import './data/form_data.dart';
 import './widgets/step_header.dart';
 import './widgets/prediction_footer.dart';
+import './widgets/prediction_result_dialog.dart';
 import './widgets/steps/step1_profile.dart';
 import './widgets/steps/step2_quality.dart';
 import './widgets/steps/step3_activity.dart';
 import '../core/widgets/app_header.dart';
 import '../core/widgets/bottom_navigation.dart';
+import '../core/widgets/services/api_services.dart';
 
 class AssessmentScreen extends StatefulWidget {
   const AssessmentScreen({super.key});
@@ -17,12 +19,15 @@ class AssessmentScreen extends StatefulWidget {
 
 class _AssessmentScreenState extends State<AssessmentScreen>
     with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
+
   @override
   bool get wantKeepAlive => true;
 
   final UserFormData _formData = UserFormData();
   int _currentStep = 1;
   static const int _totalSteps = 3;
+
+  bool _isLoading = false;
 
   late final AnimationController _stepAnimController;
   late Animation<double> _stepFadeAnim;
@@ -66,7 +71,13 @@ class _AssessmentScreenState extends State<AssessmentScreen>
     _stepAnimController.forward(from: 0);
   }
 
+  // FIX: validasi step saat ini sebelum lanjut
   void _nextStep() {
+    final error = _validateCurrentStep();
+    if (error != null) {
+      _showError(error);
+      return;
+    }
     if (_currentStep < _totalSteps) {
       _goToStep(_currentStep + 1, forward: true);
     }
@@ -78,8 +89,61 @@ class _AssessmentScreenState extends State<AssessmentScreen>
     }
   }
 
-  void _submit() {
-    // TODO: implementasi submit
+  // FIX: validasi step terakhir sebelum submit
+  void _submit() async {
+    final error = _validateCurrentStep();
+    if (error != null) {
+      _showError(error);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final request = SleepPredictionRequest.fromFormData(_formData);
+      final result = await ApiService().predict(request);
+
+      if (mounted) {
+        showPredictionResult(context, result);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError(e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // FIX: helper validasi berdasarkan step aktif
+  String? _validateCurrentStep() {
+    switch (_currentStep) {
+      case 1: return _formData.validateStep1();
+      case 2: return _formData.validateStep2();
+      case 3: return _formData.validateStep3();
+      default: return null;
+    }
+  }
+
+  // FIX: helper tampil error pakai SnackBar
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: const Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -116,6 +180,7 @@ class _AssessmentScreenState extends State<AssessmentScreen>
               onNext: _nextStep,
               onBack: _prevStep,
               onSubmit: _submit,
+              isLoading: _isLoading,
             ),
           ],
         ),

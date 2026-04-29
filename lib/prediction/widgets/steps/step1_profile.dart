@@ -161,8 +161,8 @@ class Step1Profile extends StatelessWidget {
                           label: 'Usia',
                           hint: '25',
                           type: TextInputType.number,
-                          onSaved: (v) =>
-                              formData.age = int.tryParse(v ?? '') ?? 0,
+                          onChanged: (v) =>
+                              onUpdate(() => formData.age = int.tryParse(v) ?? 0),
                         ),
                       ),
                     ),
@@ -208,7 +208,9 @@ class Step1Profile extends StatelessWidget {
                       label: 'Pekerjaan Lainnya',
                       hint: 'Contoh: Arsitek, Desainer, Wirausaha',
                       type: TextInputType.text,
-                      onSaved: (v) => formData.customJob = v ?? '',
+                      // FIX: ganti onSaved ke onChanged supaya nilai tersimpan realtime
+                      onChanged: (v) =>
+                          onUpdate(() => formData.customJob = v ?? ''),
                     ),
                   ),
                 ],
