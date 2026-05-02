@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'widgets/condition_card.dart';
 import 'sleep_condition.dart';
-import '../core/widgets/app_header.dart';
-import '../core/widgets/bottom_navigation.dart';
-
 class EducationScreen extends StatelessWidget {
   const EducationScreen({super.key});
 

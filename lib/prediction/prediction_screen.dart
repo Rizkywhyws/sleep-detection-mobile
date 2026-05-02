@@ -6,8 +6,6 @@ import './widgets/prediction_result_dialog.dart';
 import './widgets/steps/step1_profile.dart';
 import './widgets/steps/step2_quality.dart';
 import './widgets/steps/step3_activity.dart';
-import '../core/widgets/app_header.dart';
-import '../core/widgets/bottom_navigation.dart';
 import '../core/widgets/services/api_services.dart';
 
 class AssessmentScreen extends StatefulWidget {
