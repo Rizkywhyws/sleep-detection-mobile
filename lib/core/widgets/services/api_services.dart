@@ -4,7 +4,7 @@ import '../../../prediction/data/form_data.dart';
 
 class ApiService {
   // FIX: hapus /api karena route Flask langsung /predict bukan /api/predict
-  static const String baseUrl = 'http://10.10.7.209:8000';
+  static const String baseUrl = 'http://10.10.177.18:8000';
 
   Future<SleepPredictionResult> predict(SleepPredictionRequest request) async {
     try {
