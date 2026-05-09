@@ -9,6 +9,9 @@ class SleepCondition {
   final List<String> symptoms;
   final String tip;
   final String tipLabel;
+  final Color accent;
+
+  // Light mode colors (unchanged)
   final Color cardColor;
   final Color badgeColor;
   final Color badgeTextColor;
@@ -17,7 +20,6 @@ class SleepCondition {
   final Color pillColor;
   final Color pillTextColor;
   final Color tipBoxColor;
-  final Color decoColor;
 
   const SleepCondition({
     required this.id,
@@ -28,6 +30,7 @@ class SleepCondition {
     required this.symptoms,
     required this.tip,
     required this.tipLabel,
+    required this.accent,
     required this.cardColor,
     required this.badgeColor,
     required this.badgeTextColor,
@@ -36,7 +39,6 @@ class SleepCondition {
     required this.pillColor,
     required this.pillTextColor,
     required this.tipBoxColor,
-    required this.decoColor,
   });
 }
 
@@ -51,6 +53,7 @@ final List<SleepCondition> sleepConditions = [
     symptoms: ['Sulit tertidur', 'Sering terbangun', 'Mudah lelah', 'Sulit fokus', 'Mood buruk'],
     tip: 'Hindari kafein setelah jam 2 siang, matikan layar 1 jam sebelum tidur, dan coba teknik pernapasan 4-7-8.',
     tipLabel: 'Tips Mengatasi',
+    accent: Color(0xFFEF5350),
     cardColor: Color(0xFFFFF0EE),
     badgeColor: Color(0xFFFFDAD5),
     badgeTextColor: Color(0xFF993C1D),
@@ -59,7 +62,6 @@ final List<SleepCondition> sleepConditions = [
     pillColor: Color(0xFFFFDAD5),
     pillTextColor: Color(0xFF7A2418),
     tipBoxColor: Color(0xFFFFE8E4),
-    decoColor: Color(0xFFD85A30),
   ),
   const SleepCondition(
     id: 'sleep_apnea',
@@ -71,6 +73,7 @@ final List<SleepCondition> sleepConditions = [
     symptoms: ['Mendengkur keras', 'Terbangun sesak', 'Mengantuk siang', 'Sakit kepala pagi', 'Sulit konsentrasi'],
     tip: 'Tidur dengan posisi miring, jaga berat badan ideal, hindari alkohol, dan konsultasikan ke dokter untuk pemeriksaan lebih lanjut.',
     tipLabel: 'Tips Mengatasi',
+    accent: Color(0xFF3B82F6),
     cardColor: Color(0xFFEEF2FF),
     badgeColor: Color(0xFFC7D5FF),
     badgeTextColor: Color(0xFF1A237E),
@@ -79,7 +82,6 @@ final List<SleepCondition> sleepConditions = [
     pillColor: Color(0xFFC7D5FF),
     pillTextColor: Color(0xFF0D1B6E),
     tipBoxColor: Color(0xFFD8E2FF),
-    decoColor: Color(0xFF1E5FC2),
   ),
   const SleepCondition(
     id: 'healthy',
@@ -91,6 +93,7 @@ final List<SleepCondition> sleepConditions = [
     symptoms: ['Tidur 7–9 jam', 'Bangun segar', 'Mood stabil', 'Fokus optimal', 'Energi penuh'],
     tip: 'Pertahankan jadwal tidur yang konsisten, olahraga rutin di pagi hari, dan ciptakan lingkungan tidur yang nyaman, gelap, dan sejuk.',
     tipLabel: 'Cara Mempertahankan',
+    accent: Color(0xFF10B981),
     cardColor: Color(0xFFE8F8F2),
     badgeColor: Color(0xFFB2EDDA),
     badgeTextColor: Color(0xFF085041),
@@ -99,6 +102,5 @@ final List<SleepCondition> sleepConditions = [
     pillColor: Color(0xFFB2EDDA),
     pillTextColor: Color(0xFF064035),
     tipBoxColor: Color(0xFFC5F0E0),
-    decoColor: Color(0xFF1D9E75),
   ),
 ];

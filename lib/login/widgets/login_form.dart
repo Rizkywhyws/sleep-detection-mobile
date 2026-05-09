@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../widgets/custom_text_field.dart';
 
 class LoginForm extends StatefulWidget {
@@ -16,6 +18,7 @@ class _LoginFormState extends State<LoginForm> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _autoValidate = false;
+  bool _isLoading = false; // ← TAMBAH INI
 
   @override
   void dispose() {
@@ -24,14 +27,73 @@ class _LoginFormState extends State<LoginForm> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  // ── UBAH _handleLogin menjadi async ──────────────────────────────────────
+  Future<void> _handleLogin() async {
     setState(() => _autoValidate = true);
 
-    if (_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://localhost:8000/api/login'),
+        // Ganti dengan IP LAN jika pakai device fisik: http://192.168.x.x:8000/api/login
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'email': _usernameController.text.trim(), // field 'email' di backend menerima username juga
+          'password': _passwordController.text,
+        }),
+      );
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // ── Login berhasil ──
+        final username = data['user']['username'];
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selamat datang, $username!'),
+            backgroundColor: const Color(0xFF1565C0),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+
+        // TODO: ganti '/home' dengan route halaman utama kamu
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // ── Login gagal (401, 422, dll) ──
+        final message = data['message'] ?? 'Login gagal, coba lagi.';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      // ── Error koneksi / server tidak bisa dijangkau ──
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Login berhasil! Selamat datang di Noctura.'),
-          backgroundColor: const Color(0xFF1565C0),
+          content: const Text('Tidak dapat terhubung ke server.'),
+          backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -39,8 +101,11 @@ class _LoginFormState extends State<LoginForm> {
           margin: const EdgeInsets.all(16),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -80,12 +145,8 @@ class _LoginFormState extends State<LoginForm> {
               },
               controller: _passwordController,
               validator: (v) {
-                if (v == null || v.isEmpty) {
-                  return 'Kata sandi wajib diisi';
-                }
-                if (v.length < 6) {
-                  return 'Kata sandi minimal 6 karakter';
-                }
+                if (v == null || v.isEmpty) return 'Kata sandi wajib diisi';
+                if (v.length < 6) return 'Kata sandi minimal 6 karakter';
                 return null;
               },
             ),
@@ -117,10 +178,7 @@ class _LoginFormState extends State<LoginForm> {
         const SizedBox(height: 4),
         Text(
           'Masuk untuk melanjutkan',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           textAlign: TextAlign.center,
         ),
       ],
@@ -143,19 +201,13 @@ class _LoginFormState extends State<LoginForm> {
                   borderRadius: BorderRadius.circular(5),
                 ),
                 activeColor: const Color(0xFF000080),
-                side: const BorderSide(
-                  color: Color(0xFFC7D9F8),
-                  width: 1.5,
-                ),
+                side: const BorderSide(color: Color(0xFFC7D9F8), width: 1.5),
               ),
             ),
             const SizedBox(width: 8),
             const Text(
               'Ingat Saya',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF757575),
-              ),
+              style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
             ),
           ],
         ),
@@ -201,17 +253,28 @@ class _LoginFormState extends State<LoginForm> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(26),
-          onTap: _handleLogin,
-          child: const Center(
-            child: Text(
-              'MASUK',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2,
-              ),
-            ),
+          // ── Disable tombol saat loading ──
+          onTap: _isLoading ? null : _handleLogin,
+          child: Center(
+            // ── Tampilkan loading indicator atau teks ──
+            child: _isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'MASUK',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -224,10 +287,7 @@ class _LoginFormState extends State<LoginForm> {
       children: [
         Text(
           'Belum punya akun? ',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
         ),
         GestureDetector(
           onTap: () {},
