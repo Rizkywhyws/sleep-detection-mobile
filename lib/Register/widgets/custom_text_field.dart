@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label;
@@ -10,6 +11,7 @@ class CustomTextField extends StatelessWidget {
   final VoidCallback? onToggleObscure;
   final TextInputType keyboardType;
   final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
 
   const CustomTextField({
     super.key,
@@ -22,6 +24,7 @@ class CustomTextField extends StatelessWidget {
     this.onToggleObscure,
     this.keyboardType = TextInputType.text,
     this.errorText,
+    this.inputFormatters,
   });
 
   @override
@@ -44,16 +47,11 @@ class CustomTextField extends StatelessWidget {
           controller: controller,
           obscureText: isPassword ? obscureText : false,
           keyboardType: keyboardType,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF1A1A2E),
-          ),
+          inputFormatters: inputFormatters,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A2E)),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: TextStyle(
-              color: Colors.grey.shade400,
-              fontSize: 13,
-            ),
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
             prefixIcon: Icon(
               prefixIcon,
               color: hasError
@@ -91,9 +89,7 @@ class CustomTextField extends StatelessWidget {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30),
               borderSide: BorderSide(
-                color: hasError
-                    ? const Color(0xFFE53935)
-                    : Colors.transparent,
+                color: hasError ? const Color(0xFFE53935) : Colors.transparent,
                 width: 1,
               ),
             ),
@@ -106,10 +102,7 @@ class CustomTextField extends StatelessWidget {
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30),
-              borderSide: const BorderSide(
-                color: Color(0xFFE53935),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFE53935), width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30),

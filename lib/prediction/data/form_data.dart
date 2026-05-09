@@ -23,7 +23,6 @@ class UserFormData {
 
   String get bmiCategory {
     double b = bmi;
-    if (b < 18.5) return "Underweight";
     if (b < 24.9) return "Normal";
     if (b < 29.9) return "Overweight";
     return "Obese";
