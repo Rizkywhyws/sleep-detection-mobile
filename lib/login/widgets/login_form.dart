@@ -88,6 +88,7 @@ class _LoginFormState extends State<LoginForm> {
       );
     }
   }
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -127,12 +128,8 @@ class _LoginFormState extends State<LoginForm> {
               },
               controller: _passwordController,
               validator: (v) {
-                if (v == null || v.isEmpty) {
-                  return 'Kata sandi wajib diisi';
-                }
-                if (v.length < 6) {
-                  return 'Kata sandi minimal 6 karakter';
-                }
+                if (v == null || v.isEmpty) return 'Kata sandi wajib diisi';
+                if (v.length < 6) return 'Kata sandi minimal 6 karakter';
                 return null;
               },
             ),
@@ -164,10 +161,7 @@ class _LoginFormState extends State<LoginForm> {
         const SizedBox(height: 4),
         Text(
           'Masuk untuk melanjutkan',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           textAlign: TextAlign.center,
         ),
       ],
@@ -190,19 +184,13 @@ class _LoginFormState extends State<LoginForm> {
                   borderRadius: BorderRadius.circular(5),
                 ),
                 activeColor: const Color(0xFF000080),
-                side: const BorderSide(
-                  color: Color(0xFFC7D9F8),
-                  width: 1.5,
-                ),
+                side: const BorderSide(color: Color(0xFFC7D9F8), width: 1.5),
               ),
             ),
             const SizedBox(width: 8),
             const Text(
               'Ingat Saya',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF757575),
-              ),
+              style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
             ),
           ],
         ),
@@ -280,10 +268,7 @@ class _LoginFormState extends State<LoginForm> {
       children: [
         Text(
           'Belum punya akun? ',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
         ),
         GestureDetector(
           onTap: () {

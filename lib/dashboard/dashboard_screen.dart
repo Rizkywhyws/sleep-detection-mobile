@@ -22,23 +22,23 @@ class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   int _selectedIndex = 0;
 
-  late final AnimationController _animController;
+  late final AnimationController _tabCtrl;
   late Animation<Offset> _slideAnim;
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
+    _tabCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 280),
     );
     _slideAnim = _buildSlideAnim(forward: true);
-    _animController.value = 1.0;
+    _tabCtrl.value = 1.0;
   }
 
   @override
   void dispose() {
-    _animController.dispose();
+    _tabCtrl.dispose();
     super.dispose();
   }
 
@@ -47,7 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       begin: Offset(forward ? 0.05 : -0.05, 0),
       end: Offset.zero,
     ).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+      CurvedAnimation(parent: _tabCtrl, curve: Curves.easeOutCubic),
     );
   }
 
@@ -55,19 +55,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (index == _selectedIndex) return;
     _slideAnim = _buildSlideAnim(forward: index > _selectedIndex);
     setState(() => _selectedIndex = index);
-    _animController.forward(from: 0);
+    _tabCtrl.forward(from: 0);
   }
-
-  void _goToEducation() => _onTabTapped(3);
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
+    final size     = MediaQuery.sizeOf(context);
     final hPadding = size.width * 0.05;
-    final vGap = size.height * 0.020;
-    final isSmallScreen = size.height < 700 || size.width < 600;
+    final vGap     = size.height * 0.020;
+    final isSmall  = size.height < 700 || size.width < 600;
 
-    // ValueListenableBuilder di ROOT build — seluruh tree rebuild saat tema berubah
     return ValueListenableBuilder<bool>(
       valueListenable: AppTheme.instance,
       builder: (context, isDark, _) {
@@ -75,6 +72,12 @@ class _DashboardScreenState extends State<DashboardScreen>
 
         return Scaffold(
           backgroundColor: theme.bg,
+
+          // ✅ FIX UTAMA: Nonaktifkan resize otomatis saat keyboard muncul.
+          // Tanpa ini, seluruh Scaffold (termasuk BottomNavigation) ikut naik
+          // ketika keyboard tampil di tab AssessmentScreen.
+          resizeToAvoidBottomInset: false,
+
           body: SafeArea(
             bottom: false,
             child: Column(
@@ -86,14 +89,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                 Expanded(
                   child: Stack(
                     children: [
+                      // IndexedStack memastikan state tiap tab tidak hilang
                       IndexedStack(
                         index: _selectedIndex,
                         children: [
                           _DashboardHome(
                             hPadding: hPadding,
                             vGap: vGap,
-                            isSmallScreen: isSmallScreen,
-                            onEducationTap: _goToEducation,
+                            isSmallScreen: isSmall,
+                            onPredictionTap: () => _onTabTapped(1),
+                            onEducationTap:  () => _onTabTapped(3),
                           ),
                           const AssessmentScreen(),
                           const VisualizationScreen(),
@@ -101,18 +106,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                           const ProfileScreen(),
                         ],
                       ),
-                      // Overlay animasi transisi tab
+
+                      // Overlay animasi transisi antar tab
                       AnimatedBuilder(
-                        animation: _animController,
+                        animation: _tabCtrl,
                         builder: (context, _) {
-                          if (_animController.isCompleted) {
-                            return const SizedBox.shrink();
-                          }
+                          if (_tabCtrl.isCompleted) return const SizedBox.shrink();
                           return FadeTransition(
-                            opacity:
-                                Tween<double>(begin: 1.0, end: 0.0).animate(
+                            opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
                               CurvedAnimation(
-                                parent: _animController,
+                                parent: _tabCtrl,
                                 curve: Curves.easeOut,
                               ),
                             ),
@@ -128,6 +131,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ],
                   ),
                 ),
+
+                // BottomNavigation di luar Expanded → selalu diam di bawah
                 SafeArea(
                   top: false,
                   child: BottomNavigation(
@@ -144,42 +149,114 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
-class _DashboardHome extends StatelessWidget {
+// ── Home Tab ──────────────────────────────────────────────────────────────────
+class _DashboardHome extends StatefulWidget {
   final double hPadding;
   final double vGap;
   final bool isSmallScreen;
+  final VoidCallback onPredictionTap;
   final VoidCallback onEducationTap;
 
   const _DashboardHome({
     required this.hPadding,
     required this.vGap,
     required this.isSmallScreen,
+    required this.onPredictionTap,
     required this.onEducationTap,
   });
 
   @override
+  State<_DashboardHome> createState() => _DashboardHomeState();
+}
+
+class _DashboardHomeState extends State<_DashboardHome>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _staggerCtrl;
+  late final List<Animation<double>>  _fades;
+  late final List<Animation<Offset>>  _slides;
+
+  static const int _itemCount = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    _staggerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fades  = List.generate(_itemCount, (i) => _buildFade(i));
+    _slides = List.generate(_itemCount, (i) => _buildSlide(i));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _staggerCtrl.forward();
+    });
+  }
+
+  Animation<double> _buildFade(int index) {
+    final start = (index * 0.16).clamp(0.0, 0.8);
+    final end   = (start + 0.40).clamp(0.0, 1.0);
+    return Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _staggerCtrl,
+        curve: Interval(start, end, curve: Curves.easeOut),
+      ),
+    );
+  }
+
+  Animation<Offset> _buildSlide(int index) {
+    final start = (index * 0.16).clamp(0.0, 0.8);
+    final end   = (start + 0.40).clamp(0.0, 1.0);
+    return Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _staggerCtrl,
+        curve: Interval(start, end, curve: Curves.easeOutCubic),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _staggerCtrl.dispose();
+    super.dispose();
+  }
+
+  Widget _animated(int index, Widget child) => FadeTransition(
+        opacity: _fades[index],
+        child: SlideTransition(position: _slides[index], child: child),
+      );
+
+  @override
   Widget build(BuildContext context) {
     final children = [
-      const SleepCard(),
-      SizedBox(height: vGap),
-      const PredictionButton(),
-      SizedBox(height: vGap),
-      FeatureGrid(),
-      SizedBox(height: vGap),
-      const InsightCard(),
+      _animated(0, const SleepCard()),
+      SizedBox(height: widget.vGap),
+      _animated(1, PredictionButton(onTap: widget.onPredictionTap)),
+      SizedBox(height: widget.vGap),
+      _animated(2, const FeatureGrid()),
+      SizedBox(height: widget.vGap),
+      _animated(3, const InsightCard()),
     ];
 
-    return isSmallScreen
+    return widget.isSmallScreen
         ? SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.hPadding,
+              vertical: 16,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: children,
             ),
           )
         : Padding(
-            padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.hPadding,
+              vertical: 16,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
