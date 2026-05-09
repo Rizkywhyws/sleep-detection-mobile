@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_text_field.dart';
+import '../../service/auth_service.dart';
+import '../../dashboard/dashboard_screen.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -16,6 +19,7 @@ class _LoginFormState extends State<LoginForm> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _autoValidate = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -24,14 +28,57 @@ class _LoginFormState extends State<LoginForm> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     setState(() => _autoValidate = true);
 
-    if (_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final result = await AuthService.login(
+      username: _usernameController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      final user = result['user'];
+
+      if (_rememberMe) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_id', user['id']?.toString() ?? '');
+        await prefs.setString('username', user['username'] ?? '');
+        await prefs.setString('email', user['email'] ?? '');
+        await prefs.setString('role', user['role'] ?? '');
+        await prefs.setBool('is_logged_in', true);
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Login berhasil! Selamat datang di Noctura.'),
+          content: Text(result['message'] ?? 'Login berhasil'),
           backgroundColor: const Color(0xFF1565C0),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const DashboardScreen(),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Login gagal'),
+          backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -201,17 +248,26 @@ class _LoginFormState extends State<LoginForm> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(26),
-          onTap: _handleLogin,
-          child: const Center(
-            child: Text(
-              'MASUK',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2,
-              ),
-            ),
+          onTap: _isLoading ? null : _handleLogin,
+          child: Center(
+            child: _isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'MASUK',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -230,7 +286,9 @@ class _LoginFormState extends State<LoginForm> {
           ),
         ),
         GestureDetector(
-          onTap: () {},
+          onTap: () {
+            Navigator.pushNamed(context, '/register');
+          },
           child: const Text(
             'Daftar',
             style: TextStyle(
