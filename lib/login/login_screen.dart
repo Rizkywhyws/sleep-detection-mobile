@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/widgets/wavy_header.dart';
 import 'widgets/login_form.dart';
-import 'widgets/social_login.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -21,7 +20,7 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 40),
               const LoginForm(),
               const SizedBox(height: 36),
-              const SocialLogin(),
+              //const SocialLogin(),
               const SizedBox(height: 24),
             ],
           ),

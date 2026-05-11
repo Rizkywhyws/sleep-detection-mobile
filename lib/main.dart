@@ -19,16 +19,16 @@ class NocturaApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Inter',
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B1D51)), // Navy Blue Base
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B1D51)),
       ),
-      home: const LoginScreen(), // 🔄 Login jadi halaman pertama
+      home: const LoginScreen(),
       routes: {
-        
-        '/dashboard': (context) => const DashboardScreen(),
-        '/assessment': (context) => const AssessmentScreen(),
-        '/education': (context) => const EducationScreen(),
+        '/login':         (context) => const LoginScreen(),       
+        '/dashboard':     (context) => const DashboardScreen(),
+        '/assessment':    (context) => const AssessmentScreen(),
+        '/education':     (context) => const EducationScreen(),
         '/visualization': (context) => const VisualizationScreen(),
-        '/register': (context) => const RegisterScreen(),
+        '/register':      (context) => const RegisterScreen(),
       },
     );
   }

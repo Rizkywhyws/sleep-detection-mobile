@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_text_field.dart';
 import '../../service/auth_service.dart';
-import '../../dashboard/dashboard_screen.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -12,14 +10,14 @@ class LoginForm extends StatefulWidget {
 }
 
 class _LoginFormState extends State<LoginForm> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey            = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _rememberMe = false;
-  bool _autoValidate = false;
-  bool _isLoading = false;
+  bool _rememberMe      = false;
+  bool _autoValidate    = false;
+  bool _isLoading       = false;
 
   @override
   void dispose() {
@@ -30,7 +28,6 @@ class _LoginFormState extends State<LoginForm> {
 
   Future<void> _handleLogin() async {
     setState(() => _autoValidate = true);
-
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -40,55 +37,33 @@ class _LoginFormState extends State<LoginForm> {
       password: _passwordController.text,
     );
 
-    setState(() => _isLoading = false);
-
+    // ✅ FIX: cek mounted setelah semua await selesai
     if (!mounted) return;
 
+    setState(() => _isLoading = false);
+
     if (result['success'] == true) {
-      final user = result['user'];
-
-      if (_rememberMe) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_id', user['id']?.toString() ?? '');
-        await prefs.setString('username', user['username'] ?? '');
-        await prefs.setString('email', user['email'] ?? '');
-        await prefs.setString('role', user['role'] ?? '');
-        await prefs.setBool('is_logged_in', true);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Login berhasil'),
-          backgroundColor: const Color(0xFF1565C0),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const DashboardScreen(),
-        ),
+      // ✅ FIX: Hapus blok SharedPreferences di sini
+      // auth_token + user_id sudah disimpan di dalam AuthService.login()
+      // sehingga tidak ada await tambahan yang bisa menyebabkan
+      // "deactivated widget" error sebelum Navigator dipanggil
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/dashboard',
+        (route) => false,
       );
     } else {
+      // ✅ Aman: tidak ada await setelah ini, context masih aktif
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['message'] ?? 'Login gagal'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -110,9 +85,7 @@ class _LoginFormState extends State<LoginForm> {
               icon: Icons.person_outline_rounded,
               controller: _usernameController,
               validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return 'Nama pengguna wajib diisi';
-                }
+                if (v == null || v.trim().isEmpty) return 'Nama pengguna wajib diisi';
                 return null;
               },
             ),
@@ -123,9 +96,8 @@ class _LoginFormState extends State<LoginForm> {
               icon: Icons.lock_outline_rounded,
               isPassword: true,
               obscureText: _obscurePassword,
-              onTogglePassword: () {
-                setState(() => _obscurePassword = !_obscurePassword);
-              },
+              onTogglePassword: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
               controller: _passwordController,
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Kata sandi wajib diisi';
@@ -181,17 +153,14 @@ class _LoginFormState extends State<LoginForm> {
                 value: _rememberMe,
                 onChanged: (v) => setState(() => _rememberMe = v ?? false),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
+                    borderRadius: BorderRadius.circular(5)),
                 activeColor: const Color(0xFF000080),
                 side: const BorderSide(color: Color(0xFFC7D9F8), width: 1.5),
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
-              'Ingat Saya',
-              style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
-            ),
+            const Text('Ingat Saya',
+                style: TextStyle(fontSize: 13, color: Color(0xFF757575))),
           ],
         ),
         TextButton(
@@ -204,10 +173,9 @@ class _LoginFormState extends State<LoginForm> {
           child: const Text(
             'Lupa Kata Sandi?',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF000080),
-            ),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF000080)),
           ),
         ),
       ],
@@ -243,9 +211,7 @@ class _LoginFormState extends State<LoginForm> {
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
+                        strokeWidth: 2.5, color: Colors.white),
                   )
                 : const Text(
                     'MASUK',
@@ -266,21 +232,16 @@ class _LoginFormState extends State<LoginForm> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          'Belum punya akun? ',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-        ),
+        Text('Belum punya akun? ',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
         GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(context, '/register');
-          },
+          onTap: () => Navigator.pushNamed(context, '/register'),
           child: const Text(
             'Daftar',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF000080),
-            ),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF000080)),
           ),
         ),
       ],
