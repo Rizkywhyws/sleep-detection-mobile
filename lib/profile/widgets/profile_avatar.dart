@@ -1,8 +1,17 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 class ProfileAvatar extends StatelessWidget {
   final bool isDark;
-  const ProfileAvatar({super.key, required this.isDark});
+  final Uint8List? imageBytes; // ← tambah
+  final VoidCallback? onTapCamera; // ← tambah
+
+  const ProfileAvatar({
+    super.key,
+    required this.isDark,
+    this.imageBytes,
+    this.onTapCamera,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -12,17 +21,19 @@ class ProfileAvatar extends StatelessWidget {
           width: 96,
           height: 96,
           decoration: BoxDecoration(
-            gradient: isDark
-                ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF2D2860), Color(0xFF1A1640)],
-                  )
-                : const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFEAF2FF), Color(0xFFDCEBFF)],
-                  ),
+            gradient: imageBytes != null
+                ? null // tidak perlu gradient kalau ada foto
+                : isDark
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF2D2860), Color(0xFF1A1640)],
+                      )
+                    : const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFEAF2FF), Color(0xFFDCEBFF)],
+                      ),
             shape: BoxShape.circle,
             border: Border.all(
               color: isDark ? const Color(0xFF4F46E5).withOpacity(0.50) : Colors.white,
@@ -37,17 +48,26 @@ class ProfileAvatar extends StatelessWidget {
                     BoxShadow(color: const Color(0xFF071A52).withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 8)),
                   ],
           ),
-          child: Icon(
-            Icons.person_rounded,
-            color: isDark ? const Color(0xFFB9ABFF) : const Color(0xFF2563EB),
-            size: 48,
-          ),
+          child: imageBytes != null
+              ? ClipOval(
+                  child: Image.memory(
+                    imageBytes!,
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Icon(
+                  Icons.person_rounded,
+                  color: isDark ? const Color(0xFFB9ABFF) : const Color(0xFF2563EB),
+                  size: 48,
+                ),
         ),
         Positioned(
           bottom: 2,
           right: 2,
           child: GestureDetector(
-            onTap: () {},
+            onTap: onTapCamera, // ← pakai callback
             child: Container(
               width: 30,
               height: 30,

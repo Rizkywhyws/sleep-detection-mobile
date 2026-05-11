@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/app_theme.dart';
+import 'account_settings_screen.dart'; // ← import screen baru
 
 class ProfileMenuList extends StatelessWidget {
   const ProfileMenuList({super.key});
@@ -12,6 +13,61 @@ class ProfileMenuList extends StatelessWidget {
     _MenuItemData(icon: Icons.auto_stories_rounded,     label: 'Riwayat Edukasi',   subtitle: 'Artikel yang pernah dibaca',      iconBg: Color(0xFFFFF7ED), iconColor: Color(0xFFEA580C)),
     _MenuItemData(icon: Icons.headset_mic_rounded,      label: 'Dukungan & Bantuan', subtitle: 'FAQ, kontak tim, laporan bug',   iconBg: Color(0xFFEFF6FF), iconColor: Color(0xFF0284C7)),
   ];
+
+
+  // Setiap index item dipetakan ke route/action masing-masing.
+  // Menambah route baru cukup di sini tanpa menyentuh _MenuItem.
+  VoidCallback _resolveOnTap(BuildContext context, int index) {
+    switch (index) {
+      case 0: // Pengaturan Akun
+        return () => Navigator.of(context).push(
+              _buildRoute(const AccountSettingsScreen()),
+            );
+      case 1: // Ekspor Data Tidur
+        return () {/* TODO: navigate to ExportDataScreen */};
+      case 2: // Tujuan Tidur
+        return () {/* TODO: navigate to SleepGoalScreen */};
+      case 3: // Preferensi Prediksi
+        return () {/* TODO: navigate to PredictionPrefsScreen */};
+      case 4: // Riwayat Edukasi
+        return () {/* TODO: navigate to EducationHistoryScreen */};
+      case 5: // Dukungan & Bantuan
+        return () {/* TODO: navigate to SupportScreen */};
+      default:
+        return () {};
+    }
+  }
+
+  /// Custom page route dengan slide transition dari kanan (iOS-style).
+  /// Konsisten dengan navigasi sistem iOS maupun Material 3.
+  static PageRoute<void> _buildRoute(Widget page) {
+    return PageRouteBuilder<void>(
+      pageBuilder: (_, __, ___) => page,
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 250),
+      transitionsBuilder: (_, animation, secondaryAnimation, child) {
+        const begin = Offset(1.0, 0.0);
+        const end = Offset.zero;
+        final tween = Tween(begin: begin, end: end)
+            .chain(CurveTween(curve: Curves.easeOutCubic));
+        final offsetAnimation = animation.drive(tween);
+
+        // Slide-out effect untuk halaman sebelumnya
+        final secondaryTween = Tween(
+          begin: Offset.zero,
+          end: const Offset(-0.25, 0.0),
+        ).chain(CurveTween(curve: Curves.easeOutCubic));
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: SlideTransition(
+            position: secondaryAnimation.drive(secondaryTween),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +106,7 @@ class ProfileMenuList extends StatelessWidget {
                 data: _items[i],
                 showDivider: !isLast,
                 isDark: isDark,
-                onTap: () {},
+                onTap: _resolveOnTap(context, i), // ← dipetakan per-index
               );
             }),
           ),
@@ -59,6 +115,8 @@ class ProfileMenuList extends StatelessWidget {
     );
   }
 }
+
+// ─── Data Model ───────────────────────────────────────────────────────────────
 
 class _MenuItemData {
   final IconData icon;
@@ -74,6 +132,8 @@ class _MenuItemData {
     required this.iconColor,
   });
 }
+
+// ─── Item Widget ──────────────────────────────────────────────────────────────
 
 class _MenuItem extends StatelessWidget {
   final _MenuItemData data;

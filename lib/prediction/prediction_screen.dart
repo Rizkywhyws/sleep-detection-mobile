@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // ✅ FIX: tambah import
 import './data/form_data.dart';
 import './widgets/step_header.dart';
 import './widgets/prediction_footer.dart';
@@ -68,7 +69,7 @@ class _AssessmentScreenState extends State<AssessmentScreen>
 
   void _nextStep() {
     final error = _validateCurrentStep();
-    if (error != null) { _showError(error); return; }
+    if (error != null) { _showSnackError(error); return; }
     if (_currentStep < _totalSteps) _goToStep(_currentStep + 1, forward: true);
   }
 
@@ -78,29 +79,30 @@ class _AssessmentScreenState extends State<AssessmentScreen>
 
   Future<void> _submit() async {
     final error = _validateCurrentStep();
-    if (error != null) { _showError(error); return; }
+    if (error != null) { _showSnackError(error); return; }
+
     setState(() => _isLoading = true);
     try {
-      final request = SleepPredictionRequest.fromFormData(_formData);
+      // ✅ FIX: Ambil userId dari SharedPreferences sebelum membuat request
+      final prefs  = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+
+      // ✅ FIX: Teruskan userId sebagai argumen ke-2
+      final request = SleepPredictionRequest.fromFormData(_formData, userId);
       final result  = await ApiService().predict(request);
+
       if (mounted) showPredictionResult(context, result);
     } catch (e) {
-      if (mounted) _showError(e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        _showErrorDialog(e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  String? _validateCurrentStep() {
-    switch (_currentStep) {
-      case 1: return _formData.validateStep1();
-      case 2: return _formData.validateStep2();
-      case 3: return _formData.validateStep3();
-      default: return null;
-    }
-  }
-
-  void _showError(String message) {
+  // ── Error validasi step (synchronous — SnackBar aman) ──────────────────────
+  void _showSnackError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -118,6 +120,120 @@ class _AssessmentScreenState extends State<AssessmentScreen>
     );
   }
 
+  // ── Error API (asynchronous — Dialog aman setelah await) ───────────────────
+  void _showErrorDialog(String message) {
+    final isConnectionError =
+        message.toLowerCase().contains('xmlhttprequest') ||
+        message.toLowerCase().contains('failed host') ||
+        message.toLowerCase().contains('connection') ||
+        message.toLowerCase().contains('network') ||
+        message.toLowerCase().contains('socketexception');
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC2626).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                color: Color(0xFFDC2626),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Gagal Terhubung',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Text(
+              isConnectionError
+                  ? 'Tidak dapat terhubung ke server. Pastikan:\n\n'
+                    '• Server Laravel sudah berjalan\n'
+                    '• URL API sudah benar\n'
+                    '• Koneksi internet aktif'
+                  : message,
+              style: const TextStyle(
+                fontSize: 13.5,
+                height: 1.6,
+                color: Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF94A3B8),
+                  fontFamily: 'monospace',
+                ),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Tutup'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _submit(); // retry
+            },
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Coba Lagi'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _validateCurrentStep() {
+    switch (_currentStep) {
+      case 1: return _formData.validateStep1();
+      case 2: return _formData.validateStep2();
+      case 3: return _formData.validateStep3();
+      default: return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -125,29 +241,21 @@ class _AssessmentScreenState extends State<AssessmentScreen>
     return ValueListenableBuilder<bool>(
       valueListenable: AppTheme.instance,
       builder: (context, isDark, _) {
-        final scaffoldBg = isDark ? const Color(0xFF0D0B1A) : const Color(0xFFF5F7FA);
+        final scaffoldBg =
+            isDark ? const Color(0xFF0D0B1A) : const Color(0xFFF5F7FA);
 
         return Scaffold(
           backgroundColor: scaffoldBg,
-
-          // ✅ FIX: Scaffold inner juga harus false.
-          // Meskipun DashboardScreen sudah false, Scaffold ini
-          // tetap merespons keyboard secara independen jika tidak diset.
           resizeToAvoidBottomInset: false,
-
           body: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header & title — selalu diam di atas
                 StepHeader(
                   currentStep: _currentStep,
                   onBack: _currentStep > 1 ? _prevStep : null,
                 ),
                 _TitleSection(step: _currentStep, isDark: isDark),
-
-                // Konten step — SingleChildScrollView di dalam setiap step
-                // sudah cukup untuk handle scroll di atas keyboard
                 Expanded(
                   child: AnimatedBuilder(
                     animation: _stepAnimController,
@@ -161,8 +269,6 @@ class _AssessmentScreenState extends State<AssessmentScreen>
                     child: _buildCurrentStep(),
                   ),
                 ),
-
-                // Footer — selalu diam di bawah, tidak ikut keyboard
                 AssessmentFooter(
                   currentStep: _currentStep,
                   totalSteps: _totalSteps,
@@ -181,24 +287,25 @@ class _AssessmentScreenState extends State<AssessmentScreen>
 
   Widget _buildCurrentStep() {
     switch (_currentStep) {
-      case 1:  return Step1Profile(formData: _formData, onUpdate: (fn) => setState(fn));
-      case 2:  return Step2Quality(formData: _formData, onUpdate: (fn) => setState(fn));
-      case 3:  return Step3Activity(formData: _formData, onUpdate: (fn) => setState(fn));
-      default: return Step1Profile(formData: _formData, onUpdate: (fn) => setState(fn));
+      case 1:
+        return Step1Profile(formData: _formData, onUpdate: (fn) => setState(fn));
+      case 2:
+        return Step2Quality(formData: _formData, onUpdate: (fn) => setState(fn));
+      case 3:
+        return Step3Activity(formData: _formData, onUpdate: (fn) => setState(fn));
+      default:
+        return Step1Profile(formData: _formData, onUpdate: (fn) => setState(fn));
     }
   }
 }
 
 // ── Keyboard-aware wrapper ────────────────────────────────────────────────────
-// Memberi padding bawah = tinggi keyboard secara animasi,
-// sehingga konten scroll bisa naik tanpa menggeser footer & bottom nav.
 class _KeyboardAwareContent extends StatelessWidget {
   final Widget child;
   const _KeyboardAwareContent({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    // viewInsetsOf lebih efisien: hanya rebuild saat keyboard height berubah
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
 
     return AnimatedPadding(

@@ -3,7 +3,6 @@ import '../core/widgets/app_theme.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/sleep_stats_card.dart';
 import 'widgets/profile_menu_list.dart';
-import 'widgets/premium_card.dart';
 import 'widgets/logout_button.dart';
 import 'widgets/profile_footer.dart';
 
@@ -31,7 +30,7 @@ class ProfileScreen extends StatelessWidget {
                     const ProfileHeader(),
                     const SleepStatsCard(),
                     const SizedBox(height: 16),
-                    const PremiumCard(),
+                    // const PremiumCard(),
                     const SizedBox(height: 16),
                     const ProfileMenuList(),
                     const SizedBox(height: 16),
