@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import '/models/user_model.dart';
 
 class AuthService {
-  static const String _baseUrl = 'http://10.0.2.2:8000/api';
+  static const String _baseUrl = 'http://127.0.0.1:8000/api';
   // Flutter Web  → http://localhost:8000/api
   // Device fisik → http://192.168.x.x:8000/api
 
