@@ -8,7 +8,7 @@ import '../../../core/model/sleep_solution_result.dart';
 import '../../../core/model/sleep_prediction_result.dart';
 
 class ApiService {
-  static const String baseUrl ='http://10.10.184.173:8000';
+  static const String baseUrl ='http://10.10.182.189:8000';
 
   // ── Singleton ─────────────────────────────────────────────────────────────
   static final ApiService instance = ApiService._internal();
