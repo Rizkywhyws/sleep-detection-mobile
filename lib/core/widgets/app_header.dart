@@ -1,5 +1,3 @@
-// lib/shared/widgets/app_header.dart
-
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,11 +30,12 @@ class _AppHeaderState extends State<AppHeader>
   late final Animation<double> _burstScale;
   late final Animation<double> _burstOpacity;
 
-  final GlobalKey _btnKey       = GlobalKey();
+  final GlobalKey _btnKey      = GlobalKey();
   Offset          _rippleOrigin = const Offset(300, 24);
   Color           _rippleColor  = const Color(0xFF0F172A);
   bool            _animating    = false;
 
+  // Gunakan String? agar DDC web tidak throw saat belum terisi
   String?    _displayName;
   Uint8List? _imageBytes;
 
@@ -77,6 +76,7 @@ class _AppHeaderState extends State<AppHeader>
     try {
       final prefs    = await SharedPreferences.getInstance();
       if (!mounted) return;
+      // Explicit cast ke String untuk mencegah DDC null cast error
       final fullName = (prefs.getString('full_name') ?? '').trim();
       final username = (prefs.getString('username')  ?? '').trim();
       final name     = fullName.isNotEmpty ? fullName : username;
@@ -147,9 +147,9 @@ class _AppHeaderState extends State<AppHeader>
 
   @override
   Widget build(BuildContext context) {
-    final isDark   = widget.isDarkMode;
-    final headerBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final divColor = isDark
+    final isDark    = widget.isDarkMode;
+    final headerBg  = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final divColor  = isDark
         ? const Color(0xFF4F46E5).withOpacity(0.25)
         : const Color(0xFFE2E8F0).withOpacity(0.75);
     final maxRadius = (MediaQuery.sizeOf(context).width +
@@ -161,13 +161,11 @@ class _AppHeaderState extends State<AppHeader>
       decoration: BoxDecoration(
         color: headerBg,
         boxShadow: isDark
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF4F46E5).withOpacity(0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                )
-              ]
+            ? [BoxShadow(
+                color: const Color(0xFF4F46E5).withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )]
             : null,
       ),
       child: Column(
@@ -207,7 +205,7 @@ class _AppHeaderState extends State<AppHeader>
                               child: _TitleSection(
                                 greeting:    _getGreeting(),
                                 isDarkMode:  isDark,
-                                displayName: _displayName,
+                                displayName: _displayName, // nullable, aman
                               ),
                             ),
                           ],
@@ -230,7 +228,7 @@ class _AppHeaderState extends State<AppHeader>
                           RepaintBoundary(
                             child: _HistoryButton(
                               isDarkMode: isDark,
-                              onTap:      _onHistoryTap, // ← terhubung
+                              onTap: widget.onHistoryTap,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -286,13 +284,9 @@ class _RipplePainter extends CustomPainter {
     final r = (maxRadius * expandProgress - maxRadius * collapseProgress)
         .clamp(0.0, maxRadius);
     if (r <= 0) return;
-    canvas.drawCircle(
-      origin,
-      r,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.fill,
-    );
+    canvas.drawCircle(origin, r, Paint()
+      ..color = color
+      ..style = PaintingStyle.fill);
   }
 
   @override
@@ -417,7 +411,7 @@ class _ThemeButton extends StatelessWidget {
 // Avatar
 // ─────────────────────────────────────────────────────────────────────────────
 class _Avatar extends StatelessWidget {
-  final bool       isDarkMode;
+  final bool      isDarkMode;
   final Uint8List? imageBytes;
 
   const _Avatar({required this.isDarkMode, this.imageBytes});
@@ -499,11 +493,11 @@ class _Avatar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TitleSection
+// TitleSection — displayName nullable, fallback internal
 // ─────────────────────────────────────────────────────────────────────────────
 class _TitleSection extends StatelessWidget {
   final String  greeting;
-  final String? displayName;
+  final String? displayName; // ← nullable: aman saat async belum selesai
   final bool    isDarkMode;
 
   const _TitleSection({
@@ -516,6 +510,7 @@ class _TitleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final titleColor    = isDarkMode ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final subtitleColor = isDarkMode ? const Color(0xFF9B8FE8) : const Color(0xFF64748B);
+    // Null-safe fallback di satu tempat
     final name = (displayName?.isNotEmpty == true) ? displayName! : 'Noctura';
 
     return Column(

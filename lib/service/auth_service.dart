@@ -10,7 +10,7 @@ class AuthService {
     required String username,
     required String password,
   }) async {
-    final url = Uri.parse('$baseUrl/login');
+    final url = Uri.parse('$baseUrl/mobile/login');
 
     try {
       final response = await http.post(
