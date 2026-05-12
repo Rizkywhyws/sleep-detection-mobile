@@ -1,32 +1,76 @@
+// lib/core/widgets/services/api_services.dart
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../prediction/data/form_data.dart';
+import '../../../core/model/sleep_solution_result.dart';
+import '../../../core/model/sleep_prediction_result.dart';
 
 class ApiService {
-  // FIX: hapus /api karena route Flask langsung /predict bukan /api/predict
-  static const String baseUrl = 'http://10.10.7.209:8000';
+  static const String baseUrl ='http://10.10.184.173:8000';
 
+  // ── Singleton ─────────────────────────────────────────────────────────────
+  static final ApiService instance = ApiService._internal();
+  ApiService._internal();
+  factory ApiService() => instance;
+
+  // ── Auth header helper ────────────────────────────────────────────────────
+  Future<Map<String, String>> _authHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // ── Predict ───────────────────────────────────────────────────────────────
   Future<SleepPredictionResult> predict(SleepPredictionRequest request) async {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/predict'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
+            Uri.parse('$baseUrl/api/v1/predictions'),
+            headers: await _authHeaders(),
             body: jsonEncode(request.toJson()),
           )
           .timeout(const Duration(seconds: 30));
 
-      final body = jsonDecode(response.body);
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && body['status'] == 'success') {
         return SleepPredictionResult.fromJson(body);
-      } else {
-        final msg = body['message'] ?? 'Gagal mendapatkan prediksi (${response.statusCode})';
-        throw Exception(msg);
       }
+
+      throw Exception(body['message'] ?? 'Gagal mendapatkan prediksi (${response.statusCode})');
+    } on http.ClientException catch (e) {
+      throw Exception('Koneksi gagal: ${e.message}');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Terjadi kesalahan: $e');
+    }
+  }
+
+  // ── Fetch solution ────────────────────────────────────────────────────────
+  // FIX: return type diubah dari SleepPredictionResult → SleepSolutionResult
+  Future<SleepSolutionResult> fetchSolution(String predictionId) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/v1/predictions/$predictionId/solution'),
+            headers: await _authHeaders(),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && body['status'] == 'success') {
+        // FIX: deserialize ke SleepSolutionResult, bukan SleepPredictionResult
+        return SleepSolutionResult.fromJson(body['data'] as Map<String, dynamic>);
+      }
+
+      throw Exception(body['message'] ?? 'Gagal memuat solusi (${response.statusCode})');
     } on http.ClientException catch (e) {
       throw Exception('Koneksi gagal: ${e.message}');
     } catch (e) {
@@ -37,7 +81,6 @@ class ApiService {
 }
 
 // ── Request model ─────────────────────────────────────────────────────────────
-
 class SleepPredictionRequest {
   final String gender;
   final int age;
@@ -51,6 +94,7 @@ class SleepPredictionRequest {
   final int dailySteps;
   final int systolic;
   final int diastolic;
+  final String userId; // FIX: tambah field userId
 
   const SleepPredictionRequest({
     required this.gender,
@@ -65,9 +109,9 @@ class SleepPredictionRequest {
     required this.dailySteps,
     required this.systolic,
     required this.diastolic,
+    required this.userId, // FIX: tambah ke constructor
   });
 
-  // FIX: field sesuai yang diexpect Flask (tanpa user_id)
   Map<String, dynamic> toJson() => {
         'gender': gender,
         'age': age,
@@ -81,9 +125,15 @@ class SleepPredictionRequest {
         'daily_steps': dailySteps,
         'systolic': systolic,
         'diastolic': diastolic,
+        // FIX: hanya kirim user_id jika tidak kosong (aman untuk guest)
+        if (userId.isNotEmpty) 'user_id': userId,
       };
 
-  factory SleepPredictionRequest.fromFormData(UserFormData formData) {
+  // FIX: tambah parameter userId sebagai argumen ke-2
+  factory SleepPredictionRequest.fromFormData(
+    UserFormData formData,
+    String userId,
+  ) {
     int systolic = 120;
     int diastolic = 80;
     if (formData.bloodPressure.contains('/')) {
@@ -122,108 +172,7 @@ class SleepPredictionRequest {
       dailySteps: formData.steps,
       systolic: systolic,
       diastolic: diastolic,
+      userId: userId, // FIX: pass userId ke constructor
     );
-  }
-}
-
-// ── Result model ──────────────────────────────────────────────────────────────
-
-class SleepPredictionResult {
-  final String status;
-  final String prediction;
-  final Map<String, double> confidence;
-
-  // FIX: field ini tidak ada di response Flask, dibuat dari prediction
-  String get label => prediction;
-  String get emoji => _emojiFromLabel(prediction);
-  String get description => _descFromLabel(prediction);
-  String get color => _colorFromLabel(prediction);
-  String get bgColor => _bgColorFromLabel(prediction);
-  List<String> get suggestions => _suggestionsFromLabel(prediction);
-
-  const SleepPredictionResult({
-    required this.status,
-    required this.prediction,
-    required this.confidence,
-  });
-
-  factory SleepPredictionResult.fromJson(Map<String, dynamic> json) {
-    return SleepPredictionResult(
-      status: json['status'] ?? 'error',
-      prediction: json['prediction'] ?? 'Unknown',
-      confidence: json['confidence'] != null
-          ? Map<String, double>.from(
-              (json['confidence'] as Map).map(
-                (k, v) => MapEntry(k as String, (v as num).toDouble()),
-              ),
-            )
-          : {},
-    );
-  }
-
-  double get highestConfidence => confidence.isEmpty
-      ? 0.0
-      : confidence.values.reduce((a, b) => a > b ? a : b);
-
-  // ── Helper mapping label → UI ──────────────────────────────────────────────
-
-  static String _emojiFromLabel(String label) {
-    switch (label.toLowerCase()) {
-      case 'insomnia': return '😵';
-      case 'sleep apnea': return '😤';
-      default: return '😴'; // None / normal
-    }
-  }
-
-  static String _descFromLabel(String label) {
-    switch (label.toLowerCase()) {
-      case 'insomnia':
-        return 'Kamu menunjukkan tanda-tanda insomnia. Sulit tidur atau sering terbangun di malam hari.';
-      case 'sleep apnea':
-        return 'Kamu menunjukkan tanda-tanda sleep apnea. Pernapasan terganggu saat tidur.';
-      default:
-        return 'Kualitas tidurmu tergolong normal. Pertahankan kebiasaan tidur yang baik!';
-    }
-  }
-
-  static List<String> _suggestionsFromLabel(String label) {
-    switch (label.toLowerCase()) {
-      case 'insomnia':
-        return [
-          'Hindari kafein setelah pukul 14.00',
-          'Tidur dan bangun di jam yang sama setiap hari',
-          'Kurangi paparan layar 1 jam sebelum tidur',
-          'Coba teknik relaksasi atau meditasi',
-        ];
-      case 'sleep apnea':
-        return [
-          'Konsultasikan ke dokter spesialis tidur',
-          'Hindari alkohol sebelum tidur',
-          'Tidur miring, bukan telentang',
-          'Jaga berat badan ideal',
-        ];
-      default:
-        return [
-          'Pertahankan jadwal tidur yang konsisten',
-          'Olahraga rutin minimal 30 menit/hari',
-          'Kelola stres dengan baik',
-        ];
-    }
-  }
-
-  static String _colorFromLabel(String label) {
-    switch (label.toLowerCase()) {
-      case 'insomnia': return '#DC2626';
-      case 'sleep apnea': return '#D97706';
-      default: return '#16A34A';
-    }
-  }
-
-  static String _bgColorFromLabel(String label) {
-    switch (label.toLowerCase()) {
-      case 'insomnia': return '#FEF2F2';
-      case 'sleep apnea': return '#FFFBEB';
-      default: return '#F0FDF4';
-    }
   }
 }

@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NSCameraUsageDescription</key>
+	<string>Digunakan untuk mengubah foto profil</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Digunakan untuk memilih foto profil dari galeri</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Digunakan untuk menyimpan foto profil</string>
 </dict>
 </plist>
