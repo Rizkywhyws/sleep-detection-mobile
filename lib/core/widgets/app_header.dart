@@ -227,8 +227,8 @@ class _AppHeaderState extends State<AppHeader>
                           const SizedBox(width: 8),
                           RepaintBoundary(
                             child: _HistoryButton(
-                              isDarkMode: isDark,
-                              onTap: widget.onHistoryTap,
+                               isDarkMode: isDark,
+                               onTap: _onHistoryTap,
                             ),
                           ),
                           const SizedBox(width: 8),

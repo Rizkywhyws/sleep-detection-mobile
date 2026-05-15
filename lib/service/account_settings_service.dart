@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 // ─── Result Type ──────────────────────────────────────────────────────────────
 class ServiceResult {
@@ -21,7 +22,7 @@ class ServiceResult {
 class AccountSettingsService {
   AccountSettingsService._();
 
-  static const String _base = 'http://localhost:8000/api/profile'; // ← fix: tambah /profile
+  static final String _base = '${ApiConfig.baseUrl}/profile'; // ← fix: tambah /profile
 
   static const Duration _timeout = Duration(seconds: 15);
 

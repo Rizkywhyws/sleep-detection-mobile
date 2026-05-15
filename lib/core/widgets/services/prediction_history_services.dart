@@ -5,9 +5,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../model/prediction_history_result.dart';
+import '../../../config/api_config.dart';
 
 class PredictionHistoryService {
-  static const String _baseUrl = 'http://localhost:8000';
+  static const String _baseUrl = ApiConfig.baseUrl;
   static const String _tag = '[PredictionHistoryService]';
 
   static final PredictionHistoryService instance =
@@ -39,7 +40,7 @@ class PredictionHistoryService {
     int perPage = 10,
     String filter = 'all',
   }) async {
-    final uri = Uri.parse('$_baseUrl/api/v1/predictions/history').replace(
+    final uri = Uri.parse('$_baseUrl/v1/predictions/history').replace(
       queryParameters: {
         'page': '$page',
         'per_page': '$perPage',
@@ -142,7 +143,7 @@ class PredictionHistoryService {
 
   // ── Delete a history item ───────────────────────────────────────────────────
   Future<void> deleteHistory(String id) async {
-    final uri = Uri.parse('$_baseUrl/api/v1/predictions/history/$id');
+    final uri = Uri.parse('$_baseUrl/v1/predictions/history/$id');
     _log('DELETE $uri');
 
     try {
