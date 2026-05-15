@@ -1,16 +1,74 @@
+// lib/features/settings/account_settings_screen.dart
+
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/widgets/app_theme.dart';
 import '../../service/account_settings_service.dart';
+import '../../config/api_config.dart';
 
 // ─── Token Helper ─────────────────────────────────────────────────────────────
-// Ganti dengan auth provider yang sudah ada di project Anda
-// (GetStorage, Riverpod, BLoC, SecureStorage, dll).
 class _TokenStorage {
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    return prefs.getString('auth_token');
+  }
+}
+
+// ─── Preferences Service ──────────────────────────────────────────────────────
+class _PreferencesService {
+  static final String _base    = '${ApiConfig.baseUrl}/profile/preferences';
+  static const Duration _timeout = Duration(seconds: 15);
+
+  static Future<bool> update({
+    required String token,
+    required bool   weeklyReport,
+    required bool   sleepReminder,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse(_base),
+        headers: {
+          'Content-Type':  'application/json',
+          'Accept':        'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'weekly_report':   weeklyReport,
+          'sleep_reminder':  sleepReminder,
+        }),
+      ).timeout(_timeout);
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return response.statusCode == 200 && body['status'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Load preferences dari GET /api/profile
+  static Future<Map<String, bool>> load(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/profile'),
+        headers: {
+          'Accept':        'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final body  = jsonDecode(response.body) as Map<String, dynamic>;
+        final prefs = body['data']?['preferences'] as Map<String, dynamic>? ?? {};
+        return {
+          'weekly_report':  prefs['weekly_report']  as bool? ?? true,
+          'sleep_reminder': prefs['sleep_reminder'] as bool? ?? true,
+        };
+      }
+    } catch (_) {}
+    return {'weekly_report': true, 'sleep_reminder': true};
   }
 }
 
@@ -24,20 +82,46 @@ class AccountSettingsScreen extends StatefulWidget {
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   // ── Notification toggles ──────────────────────────────────────────────────
-  // TODO: inisialisasi dari GET /api/profile → preferences
-  bool _pushEnabled   = true;
-  bool _emailEnabled  = false;
   bool _weeklyReport  = true;
   bool _sleepReminder = true;
+  bool _prefsLoading  = true;
 
-  // ── Privacy toggles ───────────────────────────────────────────────────────
-  bool _analyticsEnabled = true;
-  bool _crashReport      = true;
-  bool _personalization  = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
 
-  // ─── Delegate sheet-show ke method terpusat ───────────────────────────────
-  // isDark diteruskan dari ValueListenableBuilder agar sheet memakai
-  // tema yang sama dengan layar induknya.
+  // ── Load preferences dari server ──────────────────────────────────────────
+  Future<void> _loadPreferences() async {
+    final token = await _TokenStorage.getToken();
+    if (token == null) { setState(() => _prefsLoading = false); return; }
+
+    final prefs = await _PreferencesService.load(token);
+    if (mounted) {
+      setState(() {
+        _weeklyReport  = prefs['weekly_report']  ?? true;
+        _sleepReminder = prefs['sleep_reminder'] ?? true;
+        _prefsLoading  = false;
+      });
+    }
+  }
+
+  // ── Save preferences ke server ────────────────────────────────────────────
+  Future<void> _savePreferences() async {
+    final token = await _TokenStorage.getToken();
+    if (token == null) return;
+
+    final success = await _PreferencesService.update(
+      token:         token,
+      weeklyReport:  _weeklyReport,
+      sleepReminder: _sleepReminder,
+    );
+
+    if (mounted && !success) {
+      _showSnackBar('Gagal menyimpan preferensi.', isError: true);
+    }
+  }
 
   void _openChangePassword(bool isDark) {
     showModalBottomSheet(
@@ -73,6 +157,28 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     );
   }
 
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        Icon(
+          isError
+              ? Icons.error_outline_rounded
+              : Icons.check_circle_outline_rounded,
+          color: Colors.white, size: 18,
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message,
+            style: const TextStyle(fontWeight: FontWeight.w500))),
+      ]),
+      backgroundColor:
+          isError ? const Color(0xFFE11D48) : const Color(0xFF16A34A),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -86,40 +192,31 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
         return Scaffold(
           backgroundColor: bg,
-
-          // ── AppBar ────────────────────────────────────────────────────────
           appBar: AppBar(
             backgroundColor: appBarBg,
             elevation: 0,
             scrolledUnderElevation: 0,
             leading: _BackButton(isDark: isDark, iconColor: iconClr),
-            title: Text(
-              'Pengaturan Akun',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: titleClr,
-                letterSpacing: -0.3,
-              ),
-            ),
+            title: Text('Pengaturan Akun',
+                style: TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.w700,
+                  color: titleClr, letterSpacing: -0.3,
+                )),
             centerTitle: true,
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(0.6),
               child: Divider(height: 0, thickness: 0.6, color: divClr),
             ),
           ),
-
-          // ── Body ──────────────────────────────────────────────────────────
           body: ListView(
             padding: const EdgeInsets.symmetric(vertical: 24),
             children: [
 
-              // ── Section: Keamanan Akun ─────────────────────────────────
+              // ── Section: Keamanan Akun ──────────────────────────────────
               _SectionHeader(label: 'Keamanan Akun', isDark: isDark),
               _SettingsCard(
                 isDark: isDark,
                 children: [
-                  // Ubah Kata Sandi — functional
                   _TapItem(
                     icon: Icons.lock_outline_rounded,
                     iconBg: const Color(0xFFEFF6FF),
@@ -130,8 +227,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     showDivider: true,
                     onTap: () => _openChangePassword(isDark),
                   ),
-
-                  // Ubah Email — functional
                   _TapItem(
                     icon: Icons.email_outlined,
                     iconBg: const Color(0xFFF0FDF4),
@@ -142,8 +237,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     showDivider: true,
                     onTap: () => _openChangeEmail(isDark),
                   ),
-
-                  // 2FA — coming soon badge, tetap bisa dibuka
                   _TapItem(
                     icon: Icons.verified_user_outlined,
                     iconBg: const Color(0xFFF5F3FF),
@@ -160,104 +253,63 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
               const SizedBox(height: 8),
 
-              // ── Section: Notifikasi ────────────────────────────────────
+              // ── Section: Notifikasi ─────────────────────────────────────
               _SectionHeader(label: 'Notifikasi', isDark: isDark),
-              _SettingsCard(
-                isDark: isDark,
-                children: [
-                  _ToggleItem(
-                    icon: Icons.notifications_outlined,
-                    iconBg: const Color(0xFFFFFBEB),
-                    iconColor: const Color(0xFFD97706),
-                    label: 'Push Notification',
-                    subtitle: 'Pengingat & update di perangkat',
-                    isDark: isDark,
-                    value: _pushEnabled,
-                    showDivider: true,
-                    onChanged: (v) => setState(() => _pushEnabled = v),
-                  ),
-                  _ToggleItem(
-                    icon: Icons.mark_email_unread_outlined,
-                    iconBg: const Color(0xFFEFF6FF),
-                    iconColor: const Color(0xFF0284C7),
-                    label: 'Notifikasi Email',
-                    subtitle: 'Ringkasan dikirim ke email',
-                    isDark: isDark,
-                    value: _emailEnabled,
-                    showDivider: true,
-                    onChanged: (v) => setState(() => _emailEnabled = v),
-                  ),
-                  _ToggleItem(
-                    icon: Icons.bar_chart_rounded,
-                    iconBg: const Color(0xFFF0FDF4),
-                    iconColor: const Color(0xFF16A34A),
-                    label: 'Laporan Mingguan',
-                    subtitle: 'Statistik tidur tiap minggu',
-                    isDark: isDark,
-                    value: _weeklyReport,
-                    showDivider: true,
-                    onChanged: (v) => setState(() => _weeklyReport = v),
-                  ),
-                  _ToggleItem(
-                    icon: Icons.bedtime_outlined,
-                    iconBg: const Color(0xFFF5F3FF),
-                    iconColor: const Color(0xFF7C3AED),
-                    label: 'Pengingat Tidur',
-                    subtitle: 'Ingatkan waktu tidur ideal',
-                    isDark: isDark,
-                    value: _sleepReminder,
-                    showDivider: false,
-                    onChanged: (v) => setState(() => _sleepReminder = v),
-                  ),
-                ],
-              ),
+              _prefsLoading
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1C1836) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF352F5A)
+                                : const Color(0xFFE2E8F0),
+                            width: 0.9,
+                          ),
+                        ),
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                    )
+                  : _SettingsCard(
+                      isDark: isDark,
+                      children: [
+                        _ToggleItem(
+                          icon: Icons.bar_chart_rounded,
+                          iconBg: const Color(0xFFF0FDF4),
+                          iconColor: const Color(0xFF16A34A),
+                          label: 'Laporan Mingguan',
+                          subtitle: 'Statistik tidur tiap Senin pagi',
+                          isDark: isDark,
+                          value: _weeklyReport,
+                          showDivider: true,
+                          onChanged: (v) {
+                            setState(() => _weeklyReport = v);
+                            _savePreferences(); // ← auto-save saat toggle
+                          },
+                        ),
+                        _ToggleItem(
+                          icon: Icons.bedtime_outlined,
+                          iconBg: const Color(0xFFF5F3FF),
+                          iconColor: const Color(0xFF7C3AED),
+                          label: 'Pengingat Tidur',
+                          subtitle: 'Ingatkan waktu tidur ideal jam 21:00',
+                          isDark: isDark,
+                          value: _sleepReminder,
+                          showDivider: false,
+                          onChanged: (v) {
+                            setState(() => _sleepReminder = v);
+                            _savePreferences(); // ← auto-save saat toggle
+                          },
+                        ),
+                      ],
+                    ),
 
               const SizedBox(height: 8),
 
-              // ── Section: Privasi & Data ────────────────────────────────
-              _SectionHeader(label: 'Privasi & Data', isDark: isDark),
-              _SettingsCard(
-                isDark: isDark,
-                children: [
-                  _ToggleItem(
-                    icon: Icons.analytics_outlined,
-                    iconBg: const Color(0xFFFFF7ED),
-                    iconColor: const Color(0xFFEA580C),
-                    label: 'Analitik Penggunaan',
-                    subtitle: 'Bantu kami tingkatkan aplikasi',
-                    isDark: isDark,
-                    value: _analyticsEnabled,
-                    showDivider: true,
-                    onChanged: (v) => setState(() => _analyticsEnabled = v),
-                  ),
-                  _ToggleItem(
-                    icon: Icons.bug_report_outlined,
-                    iconBg: const Color(0xFFFFF1F2),
-                    iconColor: const Color(0xFFE11D48),
-                    label: 'Laporan Crash',
-                    subtitle: 'Kirim laporan error otomatis',
-                    isDark: isDark,
-                    value: _crashReport,
-                    showDivider: true,
-                    onChanged: (v) => setState(() => _crashReport = v),
-                  ),
-                  _ToggleItem(
-                    icon: Icons.tune_rounded,
-                    iconBg: const Color(0xFFF0FDF4),
-                    iconColor: const Color(0xFF16A34A),
-                    label: 'Personalisasi',
-                    subtitle: 'Rekomendasi berdasarkan data Anda',
-                    isDark: isDark,
-                    value: _personalization,
-                    showDivider: false,
-                    onChanged: (v) => setState(() => _personalization = v),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
-              // ── Section: Lainnya ───────────────────────────────────────
+              // ── Section: Lainnya ────────────────────────────────────────
               _SectionHeader(label: 'Lainnya', isDark: isDark),
               _SettingsCard(
                 isDark: isDark,
@@ -285,7 +337,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 }
 
-// ─── Change Password Sheet ─────────────────────────────────────────────────────
+// ─── Change Password Sheet ────────────────────────────────────────────────────
 
 class _ChangePasswordSheet extends StatefulWidget {
   final bool isDark;
@@ -314,7 +366,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     super.dispose();
   }
 
-  // ── Client-side validation (fast path sebelum hit network) ────────────────
   String? _validate() {
     if (_currentCtrl.text.trim().isEmpty) return 'Kata sandi saat ini harus diisi.';
     if (_newCtrl.text.length < 8)         return 'Kata sandi baru minimal 8 karakter.';
@@ -328,7 +379,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   }
 
   Future<void> _submit() async {
-    // 1. Client validation
     final clientErr = _validate();
     if (clientErr != null) {
       setState(() => _errorMsg = clientErr);
@@ -337,17 +387,15 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
 
     setState(() { _isLoading = true; _errorMsg = null; });
 
-    // 2. Ambil token
     final token = await _TokenStorage.getToken();
     if (token == null) {
       setState(() {
         _isLoading = false;
-        _errorMsg = 'Sesi tidak valid. Silakan login ulang.';
+        _errorMsg  = 'Sesi tidak valid. Silakan login ulang.';
       });
       return;
     }
 
-    // 3. API call → PUT /api/profile/password
     final result = await AccountSettingsService.changePassword(
       currentPassword: _currentCtrl.text,
       newPassword:     _newCtrl.text,
@@ -413,7 +461,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   }
 }
 
-// ─── Change Email Sheet ────────────────────────────────────────────────────────
+// ─── Change Email Sheet ───────────────────────────────────────────────────────
 
 class _ChangeEmailSheet extends StatefulWidget {
   final bool isDark;
@@ -431,7 +479,6 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
   bool _isLoading       = false;
   String? _errorMsg;
 
-  // Regex sederhana — validasi utama tetap di sisi server
   static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
@@ -462,12 +509,11 @@ class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
     if (token == null) {
       setState(() {
         _isLoading = false;
-        _errorMsg = 'Sesi tidak valid. Silakan login ulang.';
+        _errorMsg  = 'Sesi tidak valid. Silakan login ulang.';
       });
       return;
     }
 
-    // API call → PUT /api/profile/email
     final result = await AccountSettingsService.changeEmail(
       newEmail:        _emailCtrl.text.trim(),
       currentPassword: _passwordCtrl.text,
@@ -552,39 +598,33 @@ class _TwoFAComingSoonSheet extends StatelessWidget {
               border: Border.all(
                   color: const Color(0xFF7C3AED).withOpacity(0.2), width: 0.9),
             ),
-            child: Column(
-              children: [
-                Icon(Icons.shield_outlined,
-                    size: 48,
-                    color: const Color(0xFF7C3AED).withOpacity(0.7)),
-                const SizedBox(height: 12),
-                Text(
-                  'Segera Hadir',
+            child: Column(children: [
+              Icon(Icons.shield_outlined,
+                  size: 48,
+                  color: const Color(0xFF7C3AED).withOpacity(0.7)),
+              const SizedBox(height: 12),
+              Text('Segera Hadir',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16, fontWeight: FontWeight.w700,
                     color: isDark
                         ? const Color(0xFFF1F5F9)
                         : const Color(0xFF0F172A),
+                  )),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Fitur autentikasi dua faktor sedang dalam pengembangan dan akan segera tersedia.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13, height: 1.5,
+                    color: isDark
+                        ? const Color(0xFF8B80C4)
+                        : const Color(0xFF64748B),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    'Fitur autentikasi dua faktor sedang dalam pengembangan dan akan segera tersedia.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.5,
-                      color: isDark
-                          ? const Color(0xFF8B80C4)
-                          : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ]),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -595,16 +635,14 @@ class _TwoFAComingSoonSheet extends StatelessWidget {
                 foregroundColor:
                     isDark ? const Color(0xFF8B80C4) : const Color(0xFF64748B),
                 side: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF352F5A)
-                      : const Color(0xFFE2E8F0),
-                ),
+                    color: isDark
+                        ? const Color(0xFF352F5A)
+                        : const Color(0xFFE2E8F0)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Tutup',
-                  style: TextStyle(fontSize: 15)),
+              child: const Text('Tutup', style: TextStyle(fontSize: 15)),
             ),
           ),
         ],
@@ -613,7 +651,7 @@ class _TwoFAComingSoonSheet extends StatelessWidget {
   }
 }
 
-// ─── Delete Account Dialog ─────────────────────────────────────────────────────
+// ─── Delete Account Dialog ────────────────────────────────────────────────────
 
 class _DeleteAccountDialog extends StatelessWidget {
   final bool isDark;
@@ -624,34 +662,29 @@ class _DeleteAccountDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: isDark ? const Color(0xFF1C1836) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE11D48).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.delete_outline_rounded,
-                color: Color(0xFFE11D48), size: 20),
+      title: Row(children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE11D48).withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(width: 12),
-          Text('Hapus Akun',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: isDark
-                    ? const Color(0xFFF1F5F9)
-                    : const Color(0xFF0F172A),
-              )),
-        ],
-      ),
+          child: const Icon(Icons.delete_outline_rounded,
+              color: Color(0xFFE11D48), size: 20),
+        ),
+        const SizedBox(width: 12),
+        Text('Hapus Akun',
+            style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w700,
+              color: isDark
+                  ? const Color(0xFFF1F5F9)
+                  : const Color(0xFF0F172A),
+            )),
+      ]),
       content: Text(
         'Tindakan ini akan menghapus semua data Anda secara permanen dan tidak dapat dipulihkan. Yakin ingin melanjutkan?',
         style: TextStyle(
-          fontSize: 13.5,
-          height: 1.5,
+          fontSize: 13.5, height: 1.5,
           color: isDark ? const Color(0xFF8B80C4) : const Color(0xFF64748B),
         ),
       ),
@@ -678,25 +711,20 @@ class _DeleteAccountDialog extends StatelessWidget {
 // ─── Global SnackBar ──────────────────────────────────────────────────────────
 
 void _showSuccessSnackBar(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          const Icon(Icons.check_circle_outline_rounded,
-              color: Colors.white, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(message,
-                  style: const TextStyle(fontWeight: FontWeight.w500))),
-        ],
-      ),
-      backgroundColor: const Color(0xFF16A34A),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 3),
-    ),
-  );
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Row(children: [
+      const Icon(Icons.check_circle_outline_rounded,
+          color: Colors.white, size: 18),
+      const SizedBox(width: 10),
+      Expanded(child: Text(message,
+          style: const TextStyle(fontWeight: FontWeight.w500))),
+    ]),
+    backgroundColor: const Color(0xFF16A34A),
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    margin: const EdgeInsets.all(16),
+    duration: const Duration(seconds: 3),
+  ));
 }
 
 // ─── Layout Widgets ───────────────────────────────────────────────────────────
@@ -731,20 +759,16 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.label, required this.isDark});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: isDark ? const Color(0xFF6B5FC4) : const Color(0xFF94A3B8),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
+        child: Text(label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8,
+              color: isDark
+                  ? const Color(0xFF6B5FC4)
+                  : const Color(0xFF94A3B8),
+            )),
+      );
 }
 
 class _SettingsCard extends StatelessWidget {
@@ -753,47 +777,40 @@ class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.isDark, required this.children});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        gradient: isDark
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1C1836), Color(0xFF13112A)],
-              )
-            : null,
-        color: isDark ? null : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF352F5A) : const Color(0xFFE2E8F0),
-          width: 0.9,
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1C1836), Color(0xFF13112A)],
+                )
+              : null,
+          color: isDark ? null : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? const Color(0xFF352F5A) : const Color(0xFFE2E8F0),
+            width: 0.9,
+          ),
+          boxShadow: isDark
+              ? [
+                  BoxShadow(
+                      color: const Color(0xFF4F46E5).withOpacity(0.10),
+                      blurRadius: 20, offset: const Offset(0, 6)),
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.20),
+                      blurRadius: 6, offset: const Offset(0, 2)),
+                ]
+              : [
+                  BoxShadow(
+                      color: const Color(0xFF0F172A).withOpacity(0.05),
+                      blurRadius: 16, offset: const Offset(0, 4)),
+                ],
         ),
-        boxShadow: isDark
-            ? [
-                BoxShadow(
-                    color: const Color(0xFF4F46E5).withOpacity(0.10),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6)),
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.20),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2)),
-              ]
-            : [
-                BoxShadow(
-                    color: const Color(0xFF0F172A).withOpacity(0.05),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4)),
-              ],
-      ),
-      child: Column(children: children),
-    );
-  }
+        child: Column(children: children),
+      );
 }
-
-// ─── _TapItem ─────────────────────────────────────────────────────────────────
 
 class _TapItem extends StatelessWidget {
   final IconData icon;
@@ -808,140 +825,100 @@ class _TapItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const _TapItem({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.subtitle,
-    required this.isDark,
-    required this.showDivider,
-    required this.onTap,
-    this.isDestructive = false,
-    this.badge,
+    required this.icon, required this.iconBg, required this.iconColor,
+    required this.label, required this.subtitle, required this.isDark,
+    required this.showDivider, required this.onTap,
+    this.isDestructive = false, this.badge,
   });
 
   @override
   Widget build(BuildContext context) {
     final resolvedIconBg = isDark ? iconColor.withOpacity(0.18) : iconBg;
-    final labelColor = isDestructive
+    final labelColor     = isDestructive
         ? const Color(0xFFE11D48)
         : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A));
 
-    return Column(
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
-            splashColor: iconColor.withOpacity(isDark ? 0.12 : 0.05),
-            highlightColor: iconColor.withOpacity(isDark ? 0.06 : 0.02),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: resolvedIconBg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: isDark
-                          ? Border.all(
-                              color: iconColor.withOpacity(0.28), width: 0.9)
-                          : null,
-                      boxShadow: isDark
-                          ? [BoxShadow(
-                              color: iconColor.withOpacity(0.20),
-                              blurRadius: 8)]
-                          : null,
-                    ),
-                    child: Icon(icon, size: 20, color: iconColor),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(label,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: labelColor,
-                            )),
-                        const SizedBox(height: 2),
-                        Text(subtitle,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark
-                                  ? const Color(0xFF8B80C4)
-                                  : const Color(0xFF94A3B8),
-                            )),
-                      ],
-                    ),
-                  ),
-                  // Badge (Segera) ATAU chevron
-                  if (badge != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: iconColor.withOpacity(isDark ? 0.18 : 0.10),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: iconColor.withOpacity(0.30), width: 0.8),
-                      ),
-                      child: Text(
-                        badge!,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: iconColor,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF252040)
-                            : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                        border: isDark
-                            ? Border.all(
-                                color: const Color(0xFF352F5A), width: 0.8)
-                            : null,
-                      ),
-                      child: Icon(Icons.chevron_right_rounded,
-                          size: 16,
-                          color: isDark
-                              ? const Color(0xFF6B5FC4)
-                              : const Color(0xFFCBD5E1)),
-                    ),
-                ],
+    return Column(children: [
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          splashColor:    iconColor.withOpacity(isDark ? 0.12 : 0.05),
+          highlightColor: iconColor.withOpacity(isDark ? 0.06 : 0.02),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: resolvedIconBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: isDark
+                      ? Border.all(color: iconColor.withOpacity(0.28), width: 0.9)
+                      : null,
+                  boxShadow: isDark
+                      ? [BoxShadow(color: iconColor.withOpacity(0.20), blurRadius: 8)]
+                      : null,
+                ),
+                child: Icon(icon, size: 20, color: iconColor),
               ),
-            ),
+              const SizedBox(width: 14),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: labelColor,
+                  )),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? const Color(0xFF8B80C4) : const Color(0xFF94A3B8),
+                  )),
+                ],
+              )),
+              if (badge != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(isDark ? 0.18 : 0.10),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: iconColor.withOpacity(0.30), width: 0.8),
+                  ),
+                  child: Text(badge!, style: TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w700,
+                    color: iconColor, letterSpacing: 0.3,
+                  )),
+                )
+              else
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF252040) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: isDark
+                        ? Border.all(color: const Color(0xFF352F5A), width: 0.8)
+                        : null,
+                  ),
+                  child: Icon(Icons.chevron_right_rounded,
+                      size: 16,
+                      color: isDark
+                          ? const Color(0xFF6B5FC4)
+                          : const Color(0xFFCBD5E1)),
+                ),
+            ]),
           ),
         ),
-        if (showDivider)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(
-              height: 0,
-              thickness: 0.6,
-              color:
-                  isDark ? const Color(0xFF252040) : const Color(0xFFF1F5F9),
-            ),
-          ),
-      ],
-    );
+      ),
+      if (showDivider)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Divider(height: 0, thickness: 0.6,
+              color: isDark ? const Color(0xFF252040) : const Color(0xFFF1F5F9)),
+        ),
+    ]);
   }
 }
-
-// ─── _ToggleItem ──────────────────────────────────────────────────────────────
 
 class _ToggleItem extends StatelessWidget {
   final IconData icon;
@@ -955,90 +932,62 @@ class _ToggleItem extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   const _ToggleItem({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.subtitle,
-    required this.isDark,
-    required this.value,
-    required this.showDivider,
-    required this.onChanged,
+    required this.icon, required this.iconBg, required this.iconColor,
+    required this.label, required this.subtitle, required this.isDark,
+    required this.value, required this.showDivider, required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final resolvedIconBg = isDark ? iconColor.withOpacity(0.18) : iconBg;
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: resolvedIconBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isDark
-                      ? Border.all(
-                          color: iconColor.withOpacity(0.28), width: 0.9)
-                      : null,
-                  boxShadow: isDark
-                      ? [BoxShadow(
-                          color: iconColor.withOpacity(0.20), blurRadius: 8)]
-                      : null,
-                ),
-                child: Icon(icon, size: 20, color: iconColor),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? const Color(0xFFF1F5F9)
-                              : const Color(0xFF0F172A),
-                        )),
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: isDark
-                              ? const Color(0xFF8B80C4)
-                              : const Color(0xFF94A3B8),
-                        )),
-                  ],
-                ),
-              ),
-              CupertinoSwitch(
-                value: value,
-                onChanged: onChanged,
-                activeColor: iconColor,
-                trackColor:
-                    isDark ? const Color(0xFF252040) : const Color(0xFFE2E8F0),
-              ),
-            ],
-          ),
-        ),
-        if (showDivider)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(
-              height: 0,
-              thickness: 0.6,
-              color:
-                  isDark ? const Color(0xFF252040) : const Color(0xFFF1F5F9),
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: resolvedIconBg,
+              borderRadius: BorderRadius.circular(12),
+              border: isDark
+                  ? Border.all(color: iconColor.withOpacity(0.28), width: 0.9)
+                  : null,
+              boxShadow: isDark
+                  ? [BoxShadow(color: iconColor.withOpacity(0.20), blurRadius: 8)]
+                  : null,
             ),
+            child: Icon(icon, size: 20, color: iconColor),
           ),
-      ],
-    );
+          const SizedBox(width: 14),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+              )),
+              const SizedBox(height: 2),
+              Text(subtitle, style: TextStyle(
+                fontSize: 11.5,
+                color: isDark ? const Color(0xFF8B80C4) : const Color(0xFF94A3B8),
+              )),
+            ],
+          )),
+          CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: iconColor,
+            trackColor: isDark ? const Color(0xFF252040) : const Color(0xFFE2E8F0),
+          ),
+        ]),
+      ),
+      if (showDivider)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Divider(height: 0, thickness: 0.6,
+              color: isDark ? const Color(0xFF252040) : const Color(0xFFF1F5F9)),
+        ),
+    ]);
   }
 }
 
@@ -1048,53 +997,40 @@ class _BaseSheet extends StatelessWidget {
   final bool isDark;
   final String title;
   final Widget child;
-  const _BaseSheet(
-      {required this.isDark, required this.title, required this.child});
+  const _BaseSheet({required this.isDark, required this.title, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1836) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1C1836) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(
+                width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF352F5A)
-                      : const Color(0xFFE2E8F0),
+                  color: isDark ? const Color(0xFF352F5A) : const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(2),
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(title,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? const Color(0xFFF1F5F9)
-                      : const Color(0xFF0F172A),
-                  letterSpacing: -0.3,
-                )),
-            const SizedBox(height: 20),
-            child,
-          ],
+              )),
+              const SizedBox(height: 20),
+              Text(title, style: TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w700,
+                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                letterSpacing: -0.3,
+              )),
+              const SizedBox(height: 20),
+              child,
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 // ─── Form Components ──────────────────────────────────────────────────────────
@@ -1105,31 +1041,21 @@ class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message, required this.isDark});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE11D48).withOpacity(isDark ? 0.15 : 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: const Color(0xFFE11D48).withOpacity(0.3), width: 0.9),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded,
-              size: 16, color: Color(0xFFE11D48)),
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE11D48).withOpacity(isDark ? 0.15 : 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.3), width: 0.9),
+        ),
+        child: Row(children: [
+          const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFE11D48)),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(message,
-                style: const TextStyle(
-                    fontSize: 12.5,
-                    color: Color(0xFFE11D48),
-                    fontWeight: FontWeight.w500)),
-          ),
-        ],
-      ),
-    );
-  }
+          Expanded(child: Text(message, style: const TextStyle(
+            fontSize: 12.5, color: Color(0xFFE11D48), fontWeight: FontWeight.w500,
+          ))),
+        ]),
+      );
 }
 
 class _HintText extends StatelessWidget {
@@ -1138,27 +1064,18 @@ class _HintText extends StatelessWidget {
   const _HintText({required this.text, required this.isDark});
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(Icons.info_outline_rounded,
-            size: 14,
-            color: isDark ? const Color(0xFF6B5FC4) : const Color(0xFF94A3B8)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(text,
-              style: TextStyle(
-                fontSize: 11.5,
-                height: 1.5,
-                color: isDark
-                    ? const Color(0xFF6B5FC4)
-                    : const Color(0xFF94A3B8),
-              )),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 14,
+              color: isDark ? const Color(0xFF6B5FC4) : const Color(0xFF94A3B8)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(text, style: TextStyle(
+            fontSize: 11.5, height: 1.5,
+            color: isDark ? const Color(0xFF6B5FC4) : const Color(0xFF94A3B8),
+          ))),
+        ],
+      );
 }
 
 class _PasswordField extends StatelessWidget {
@@ -1169,31 +1086,26 @@ class _PasswordField extends StatelessWidget {
   final VoidCallback onToggle;
 
   const _PasswordField({
-    required this.controller,
-    required this.label,
-    required this.obscure,
-    required this.isDark,
-    required this.onToggle,
+    required this.controller, required this.label,
+    required this.obscure, required this.isDark, required this.onToggle,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return _InputField(
-      controller: controller,
-      label: label,
-      hint: '••••••••',
-      isDark: isDark,
-      obscureText: obscure,
-      suffix: GestureDetector(
-        onTap: onToggle,
-        child: Icon(
-          obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-          size: 18,
-          color: isDark ? const Color(0xFF8B80C4) : const Color(0xFF94A3B8),
+  Widget build(BuildContext context) => _InputField(
+        controller: controller,
+        label: label,
+        hint: '••••••••',
+        isDark: isDark,
+        obscureText: obscure,
+        suffix: GestureDetector(
+          onTap: onToggle,
+          child: Icon(
+            obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            size: 18,
+            color: isDark ? const Color(0xFF8B80C4) : const Color(0xFF94A3B8),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _InputField extends StatelessWidget {
@@ -1206,13 +1118,8 @@ class _InputField extends StatelessWidget {
   final Widget? suffix;
 
   const _InputField({
-    required this.label,
-    required this.hint,
-    required this.isDark,
-    this.controller,
-    this.obscureText = false,
-    this.keyboardType,
-    this.suffix,
+    required this.label, required this.hint, required this.isDark,
+    this.controller, this.obscureText = false, this.keyboardType, this.suffix,
   });
 
   @override
@@ -1222,49 +1129,39 @@ class _InputField extends StatelessWidget {
     final labelColor  = isDark ? const Color(0xFF8B80C4) : const Color(0xFF64748B);
     final textColor   = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: labelColor,
-              letterSpacing: 0.2,
-            )),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          style: TextStyle(fontSize: 14, color: textColor),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: labelColor.withOpacity(0.6)),
-            filled: true,
-            fillColor: fillColor,
-            suffixIcon: suffix != null
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 12), child: suffix)
-                : null,
-            suffixIconConstraints:
-                const BoxConstraints(minWidth: 0, minHeight: 0),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor, width: 0.9)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor, width: 0.9)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-          ),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(
+        fontSize: 12, fontWeight: FontWeight.w600,
+        color: labelColor, letterSpacing: 0.2,
+      )),
+      const SizedBox(height: 8),
+      TextField(
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        style: TextStyle(fontSize: 14, color: textColor),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: labelColor.withOpacity(0.6)),
+          filled: true,
+          fillColor: fillColor,
+          suffixIcon: suffix != null
+              ? Padding(padding: const EdgeInsets.only(right: 12), child: suffix)
+              : null,
+          suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor, width: 0.9)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor, width: 0.9)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
         ),
-      ],
-    );
+      ),
+    ]);
   }
 }
 
@@ -1275,38 +1172,27 @@ class _PrimaryButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PrimaryButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.isLoading = false,
+    required this.label, required this.color,
+    required this.onTap, this.isLoading = false,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          disabledBackgroundColor: color.withOpacity(0.6),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          elevation: 0,
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: isLoading ? null : onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            disabledBackgroundColor: color.withOpacity(0.6),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            elevation: 0,
+          ),
+          child: isLoading
+              ? const SizedBox(width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
-              )
-            : Text(label,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
+      );
 }

@@ -5,8 +5,18 @@ import 'dashboard/dashboard_screen.dart';
 import 'prediction/prediction_screen.dart';
 import 'Register/register_screen.dart';
 import 'education/education_screen.dart';
+import 'service/notification_service.dart';
 
-void main() => runApp(const NocturaApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Init plugin saja — TIDAK schedule di sini karena token belum ada.
+  // Schedule dilakukan di NotificationHelper.initAfterLogin()
+  // yang dipanggil LoginScreen setelah login sukses.
+  await NotificationService.init();
+
+  runApp(const NocturaApp());
+}
 
 class NocturaApp extends StatelessWidget {
   const NocturaApp({super.key});
@@ -23,7 +33,7 @@ class NocturaApp extends StatelessWidget {
       ),
       home: const LoginScreen(),
       routes: {
-        '/login':         (context) => const LoginScreen(),       
+        '/login':         (context) => const LoginScreen(),
         '/dashboard':     (context) => const DashboardScreen(),
         '/assessment':    (context) => const AssessmentScreen(),
         '/education':     (context) => const EducationScreen(),

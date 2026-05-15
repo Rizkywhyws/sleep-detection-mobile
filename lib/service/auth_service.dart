@@ -27,11 +27,11 @@ class AuthService {
       if (response.statusCode == 200 && data['success'] == true) {
         final prefs = await SharedPreferences.getInstance();
 
-        // ✅ FIX 1: simpan dengan key 'auth_token' agar terbaca
+        //  FIX 1: simpan dengan key 'auth_token' agar terbaca
         //           di api_services.dart → _authHeaders()
         await prefs.setString('auth_token', data['token']);
 
-        // ✅ FIX 2: simpan user_id agar bisa dikirim ke /api/predictions
+        // FIX 2: simpan user_id agar bisa dikirim ke /api/predictions
         //           dibaca di assessment_screen.dart → _submit()
         await prefs.setString('user_id',  data['user']['id']?.toString() ?? '');
 
