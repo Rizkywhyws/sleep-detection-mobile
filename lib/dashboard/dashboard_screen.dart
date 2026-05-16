@@ -12,6 +12,7 @@ import '../visualization/visualization_screen.dart';
 import '../profile/profile_screen.dart';
 import '../sleep_log/sleep_log_screen.dart';
 import '../service/notification_service.dart';
+import '../chatbot/chatbot_screen.dart'; // ← TAMBAH INI
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -28,9 +29,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   late final AnimationController _tabCtrl;
   late Animation<Offset> _slideAnim;
 
-  // ── Key untuk trigger refresh dari luar ──────────────────────────────────
-  // GlobalKey memungkinkan DashboardScreen memanggil refresh()
-  // pada _DashboardHome tanpa rebuild seluruh tree
   final _dashboardHomeKey = GlobalKey<_DashboardHomeState>();
 
   @override
@@ -58,9 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Tween<Offset>(
       begin: Offset(forward ? 0.05 : -0.05, 0),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _tabCtrl, curve: Curves.easeOutCubic),
-    );
+    ).animate(CurvedAnimation(parent: _tabCtrl, curve: Curves.easeOutCubic));
   }
 
   void _onTabTapped(int index) {
@@ -71,17 +67,24 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _onLogTidurTap() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SleepLogScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SleepLogScreen()));
+  }
+
+  void _openChatbot() {
+    // ← TAMBAH METHOD INI
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ChatbotScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
-    final size     = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final hPadding = size.width * 0.05;
-    final vGap     = size.height * 0.020;
-    final isSmall  = size.height < 700 || size.width < 600;
+    final vGap = size.height * 0.020;
+    final isSmall = size.height < 700 || size.width < 600;
 
     return ValueListenableBuilder<bool>(
       valueListenable: AppTheme.instance,
@@ -91,6 +94,28 @@ class _DashboardScreenState extends State<DashboardScreen>
         return Scaffold(
           backgroundColor: theme.bg,
           resizeToAvoidBottomInset: false,
+
+          // ── FAB Chatbot ─────────────────────────────────────────────────
+          floatingActionButton: _selectedIndex == 0
+              ? Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: 70,
+                  ), // ← dorong ke atas setinggi bottom nav
+                  child: FloatingActionButton(
+                    onPressed: _openChatbot,
+                    backgroundColor: const Color(0xFF6C63FF),
+                    elevation: 4,
+                    shape: const CircleBorder(),
+                    tooltip: 'SleepBot',
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                )
+              : null,
+
           body: SafeArea(
             bottom: false,
             child: Column(
@@ -106,13 +131,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                         index: _selectedIndex,
                         children: [
                           _DashboardHome(
-                            key: _dashboardHomeKey, // ← pasang key
-                            hPadding:        hPadding,
-                            vGap:            vGap,
-                            isSmallScreen:   isSmall,
+                            key: _dashboardHomeKey,
+                            hPadding: hPadding,
+                            vGap: vGap,
+                            isSmallScreen: isSmall,
                             onPredictionTap: () => _onTabTapped(1),
-                            onEducationTap:  () => _onTabTapped(3),
-                            onLogTidurTap:   _onLogTidurTap,
+                            onEducationTap: () => _onTabTapped(3),
+                            onLogTidurTap: _onLogTidurTap,
                           ),
                           const AssessmentScreen(),
                           const VisualizationScreen(),
@@ -124,14 +149,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                       AnimatedBuilder(
                         animation: _tabCtrl,
                         builder: (context, _) {
-                          if (_tabCtrl.isCompleted) return const SizedBox.shrink();
+                          if (_tabCtrl.isCompleted)
+                            return const SizedBox.shrink();
                           return FadeTransition(
-                            opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
-                              CurvedAnimation(
-                                parent: _tabCtrl,
-                                curve: Curves.easeOut,
-                              ),
-                            ),
+                            opacity: Tween<double>(begin: 1.0, end: 0.0)
+                                .animate(
+                                  CurvedAnimation(
+                                    parent: _tabCtrl,
+                                    curve: Curves.easeOut,
+                                  ),
+                                ),
                             child: SlideTransition(
                               position: _slideAnim,
                               child: IgnorePointer(
@@ -149,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   top: false,
                   child: BottomNavigation(
                     selectedIndex: _selectedIndex,
-                    onTabTapped:   _onTabTapped,
+                    onTabTapped: _onTabTapped,
                   ),
                 ),
               ],
@@ -161,11 +188,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
-// ── Home Tab ──────────────────────────────────────────────────────────────────
+// ── _DashboardHome (tidak ada perubahan) ──────────────────────────────────────
 class _DashboardHome extends StatefulWidget {
-  final double       hPadding;
-  final double       vGap;
-  final bool         isSmallScreen;
+  final double hPadding;
+  final double vGap;
+  final bool isSmallScreen;
   final VoidCallback onPredictionTap;
   final VoidCallback onEducationTap;
   final VoidCallback onLogTidurTap;
@@ -186,18 +213,11 @@ class _DashboardHome extends StatefulWidget {
 
 class _DashboardHomeState extends State<_DashboardHome>
     with SingleTickerProviderStateMixin {
-  late final AnimationController     _staggerCtrl;
+  late final AnimationController _staggerCtrl;
   late final List<Animation<double>> _fades;
   late final List<Animation<Offset>> _slides;
 
-  // ── Refresh key untuk rebuild widget data ────────────────────────────────
-  // Increment _refreshKey → SleepCard, SleepGoalCard, InsightCard
-  // rebuild dengan data baru dari server.
-  // Pattern: ValueKey(int) lebih ringan daripada UniqueKey() karena
-  // hanya rebuild saat nilai berubah, bukan setiap frame.
   int _refreshKey = 0;
-
-  // ── Loading state untuk RefreshIndicator ────────────────────────────────
   bool _isRefreshing = false;
 
   static const int _itemCount = 5;
@@ -209,7 +229,7 @@ class _DashboardHomeState extends State<_DashboardHome>
       vsync: this,
       duration: const Duration(milliseconds: 650),
     );
-    _fades  = List.generate(_itemCount, (i) => _buildFade(i));
+    _fades = List.generate(_itemCount, (i) => _buildFade(i));
     _slides = List.generate(_itemCount, (i) => _buildSlide(i));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -217,17 +237,13 @@ class _DashboardHomeState extends State<_DashboardHome>
     });
   }
 
-  // ── Public method: dipanggil dari luar via GlobalKey ─────────────────────
   Future<void> refresh() async {
-    if (_isRefreshing) return; // guard: tidak double refresh
+    if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
-
-    // Beri jeda minimal 600ms agar spinner tidak kilat
     await Future.delayed(const Duration(milliseconds: 600));
-
     if (mounted) {
       setState(() {
-        _refreshKey++;       // trigger rebuild SleepCard, dll
+        _refreshKey++;
         _isRefreshing = false;
       });
     }
@@ -235,7 +251,7 @@ class _DashboardHomeState extends State<_DashboardHome>
 
   Animation<double> _buildFade(int index) {
     final start = (index * 0.14).clamp(0.0, 0.8);
-    final end   = (start + 0.38).clamp(0.0, 1.0);
+    final end = (start + 0.38).clamp(0.0, 1.0);
     return Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _staggerCtrl,
@@ -246,10 +262,10 @@ class _DashboardHomeState extends State<_DashboardHome>
 
   Animation<Offset> _buildSlide(int index) {
     final start = (index * 0.14).clamp(0.0, 0.8);
-    final end   = (start + 0.38).clamp(0.0, 1.0);
+    final end = (start + 0.38).clamp(0.0, 1.0);
     return Tween<Offset>(
       begin: const Offset(0, 0.05),
-      end:   Offset.zero,
+      end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _staggerCtrl,
@@ -265,75 +281,52 @@ class _DashboardHomeState extends State<_DashboardHome>
   }
 
   Widget _animated(int index, Widget child) => FadeTransition(
-        opacity:  _fades[index],
-        child: SlideTransition(position: _slides[index], child: child),
-      );
+    opacity: _fades[index],
+    child: SlideTransition(position: _slides[index], child: child),
+  );
 
   @override
   Widget build(BuildContext context) {
-    // ValueKey(_refreshKey) memastikan widget di-rebuild saat pull refresh.
-    // SleepCard, SleepGoalCard, InsightCard harus accept key agar bekerja.
     final children = [
       _animated(0, SleepCard(key: ValueKey('sleep_$_refreshKey'))),
-
       SizedBox(height: widget.vGap * 0.65),
-
       _animated(1, SleepGoalCard(key: ValueKey('goal_$_refreshKey'))),
-
       SizedBox(height: widget.vGap),
-
       _animated(2, PredictionButton(onTap: widget.onPredictionTap)),
-
       SizedBox(height: widget.vGap),
-
       _animated(3, FeatureGrid(onLogTidurTap: widget.onLogTidurTap)),
-
       SizedBox(height: widget.vGap),
-
       _animated(4, InsightCard(key: ValueKey('insight_$_refreshKey'))),
+      const SizedBox(height: 80), // ← ruang agar FAB tidak nutup InsightCard
     ];
 
     final scrollContent = Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: widget.hPadding,
-        vertical: 16,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: widget.hPadding, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
       ),
     );
 
-    // RefreshIndicator membungkus seluruh scroll content.
-    // onRefresh dipanggil saat user pull-down → await refresh() selesai
-    // baru spinner hilang (Flutter tunggu Future selesai otomatis).
     return RefreshIndicator(
       onRefresh: refresh,
-      // Warna spinner mengikuti theme
       color: const Color(0xFF6C63FF),
       backgroundColor: AppTheme.instance.isDark
           ? const Color(0xFF1C1836)
           : Colors.white,
       displacement: 60,
       child: widget.isSmallScreen
-          // Small screen: SingleChildScrollView sudah ada → tinggal bungkus
           ? SingleChildScrollView(
-              // physics HARUS BouncingScrollPhysics atau AlwaysScrollableScrollPhysics
-              // agar RefreshIndicator bisa trigger meski konten tidak overflow
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
               child: scrollContent,
             )
-          // Large screen: tambah SingleChildScrollView agar RefreshIndicator
-          // punya scroll parent — tanpa ini RefreshIndicator tidak bisa trigger
           : SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
               child: ConstrainedBox(
-                // Minimum height = tinggi layar agar konten tidak collapse
-                // dan pull-down tetap bisa trigger meski konten pendek
                 constraints: BoxConstraints(
                   minHeight: MediaQuery.of(context).size.height * 0.75,
                 ),

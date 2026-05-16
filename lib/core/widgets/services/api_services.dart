@@ -29,16 +29,16 @@ class ApiService {
   // ── Predict ───────────────────────────────────────────────────────────────
   Future<SleepPredictionResult> predict(SleepPredictionRequest request) async {
     try {
-      debugPrint('=== predict: hitting $baseUrl/api/v1/predictions');
+      debugPrint('=== predict: hitting $baseUrl/v1/predictions');
       debugPrint('=== predict: payload=${jsonEncode(request.toJson())}');
 
       final response = await http
           .post(
-            Uri.parse('$baseUrl/api/v1/predictions'),
+            Uri.parse('$baseUrl/v1/predictions'),
             headers: await _authHeaders(),
             body: jsonEncode(request.toJson()),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 120));
 
       debugPrint('=== predict: status=${response.statusCode}');
       debugPrint('=== predict: body=${response.body}');
@@ -63,14 +63,14 @@ class ApiService {
   // ── Fetch solution ────────────────────────────────────────────────────────
   Future<SleepSolutionResult> fetchSolution(String predictionId) async {
     try {
-      debugPrint('=== fetchSolution: hitting $baseUrl/api/v1/predictions/$predictionId/solution');
+      debugPrint('=== fetchSolution: hitting $baseUrl/v1/predictions/$predictionId/solution');
 
       final response = await http
           .post(
-            Uri.parse('$baseUrl/api/v1/predictions/$predictionId/solution'),
+            Uri.parse('$baseUrl/v1/predictions/$predictionId/solution'),
             headers: await _authHeaders(),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 120));
 
       debugPrint('=== fetchSolution: status=${response.statusCode}');
       debugPrint('=== fetchSolution: body=${response.body}');
